@@ -143,17 +143,19 @@ amount derived from the queueing that increase will add. The accelerated increas
 does not replace CUBIC's own: the greater of the two applies, so the sender is
 back on CUBIC's curve as soon as the queue reforms.
 
+In congestion avoidance, the sender sets its congestion window to
+abba_cwnd(cwnd, cwnd_cubic) in place of cwnd_cubic, where cwnd is the window
+before that update.
+
 ~~~
-on an rtt sample, while in congestion avoidance:
-  cwnd_cubic = the congestion window CUBIC sets on this acknowledgement
+abba_cwnd(cwnd, cwnd_cubic):
   if congestion-window limited
       and is_set(past_periods_min)
       and full_rtt > min_rtt + 10ms
       and full_rtt > latest_rtt * 1.05
       and latest_rtt < drain_threshold():
-    cwnd = max(cwnd_cubic, cwnd + segments_acked * ratio())
-  else:
-    cwnd = cwnd_cubic
+    return max(cwnd_cubic, cwnd + segments_acked * ratio())
+  return cwnd_cubic
 
 drain_threshold():
   estimated_floor = past_periods_min.smoothed - past_periods_min.variance / 2
@@ -200,9 +202,10 @@ Slow start overshoots the capacity of the path, so the queue is full when slow
 start ends.
 
 ~~~
-on a recovery period entered from slow start ending:
-  full_rtt = smoothed_rtt
-  last_high_queue_at = now
+on recovery exit:
+  if entered from slow start:
+    full_rtt = smoothed_rtt
+    last_high_queue_at = now
 ~~~
 
 smoothed_rtt is read before the RTT estimator is updated by the acknowledgement
@@ -220,6 +223,12 @@ min_rtt exceeds 10ms. On shorter paths the queue built may fall short of that,
 and acceleration does not engage.
 
 ## Per-Period Minima
+
+min_rtt is the lowest round-trip time of the whole connection, and may no longer
+describe a path whose floor has moved. The sender therefore also tracks the
+lowest round-trip time of the period in progress, which bounds the drain
+threshold of {{increase}}, and an estimate formed from the minima of completed
+periods, which places it.
 
 ~~~
 on an rtt sample:
@@ -285,6 +294,12 @@ expected_high_queue_interval is the time a flow on the current
 congestion-avoidance trajectory would take to refill the queue. Both a CUBIC and
 a Reno-friendly flow are considered because a sender follows the greater of the
 two curves, and the shorter of the two return times is used.
+
+Only ECN-CE marks count as observations here, not losses. A mark is unambiguous
+evidence that the queue was deep, whereas a loss may be non-congestive; were
+losses to refresh the timestamp, frequent random loss on a drained path would
+restart the interval indefinitely and recalibration could never arm on the paths
+it exists for.
 
 Twice the interval is used so that a competing flow refilling the queue on its
 own trajectory refreshes the observation well within the window. Recalibration
