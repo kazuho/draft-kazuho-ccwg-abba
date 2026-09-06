@@ -1232,10 +1232,10 @@ design rests on two premises: that loss indicates congestion, and that the
 capacity of the path is stable.<a href="#section-1-1" class="pilcrow">¶</a></p>
 <p id="section-1-2">Radio paths satisfy neither premise. Available bandwidth varies continually as
 radio quality changes with distance, obstruction, and interference. Handover
-between base stations or between satellites shifts it abruptly, and can drop the
-packets in flight at the moment of the switch. Depending on the characteristics
-of the link, packets could also be lost for reasons unrelated to queue
-occupancy.<a href="#section-1-2" class="pilcrow">¶</a></p>
+between base stations or between satellites shifts it abruptly. Packets are
+dropped in bursts rather than at random: at the moment of a handover, when the
+link layer gives up retransmitting, and when the buffer can no longer hold the
+queue. Only the last of these is congestion.<a href="#section-1-2" class="pilcrow">¶</a></p>
 <p id="section-1-3">CUBIC reacts to this in three ways:<a href="#section-1-3" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-1-4.1">
