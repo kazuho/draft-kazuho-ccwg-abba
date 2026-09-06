@@ -8,13 +8,13 @@
 <meta content="奥 一穂 (Kazuho Oku)" name="author">
 <meta content="
        This document specifies ABBA, an extension to CUBIC congestion control for paths
-whose available bandwidth changes rapidly during a connection, where CUBIC's
-ordinary increase is too slow to follow it. While the round-trip time indicates
-a drained bottleneck queue, ABBA raises the congestion window faster than CUBIC
-would, adding a controlled amount of queueing. This acceleration is gated on an
-observation of the extent of that queue, so it does not engage where a shared
-path is congested. ABBA modifies window increase only: every loss and every
-ECN-CE mark produces the reduction that CUBIC specifies. 
+whose available bandwidth changes rapidly during a connection, or that cause
+non-congestive loss. While the round-trip time indicates a drained bottleneck
+queue, ABBA raises the congestion window faster than CUBIC would, adding a
+controlled amount of queueing. This acceleration is gated on an observation of
+the extent of that queue, so it does not engage where a shared path is
+congested. ABBA modifies window increase only: every loss and every ECN-CE mark
+produces the reduction that CUBIC specifies. 
     " name="description">
 <meta content="xml2rfc 3.34.0" name="generator">
 <meta content="internet-draft" name="keyword">
@@ -1085,13 +1085,13 @@ svg {
 <section id="section-abstract">
       <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
 <p id="section-abstract-1">This document specifies ABBA, an extension to CUBIC congestion control for paths
-whose available bandwidth changes rapidly during a connection, where CUBIC's
-ordinary increase is too slow to follow it. While the round-trip time indicates
-a drained bottleneck queue, ABBA raises the congestion window faster than CUBIC
-would, adding a controlled amount of queueing. This acceleration is gated on an
-observation of the extent of that queue, so it does not engage where a shared
-path is congested. ABBA modifies window increase only: every loss and every
-ECN-CE mark produces the reduction that CUBIC specifies.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+whose available bandwidth changes rapidly during a connection, or that cause
+non-congestive loss. While the round-trip time indicates a drained bottleneck
+queue, ABBA raises the congestion window faster than CUBIC would, adding a
+controlled amount of queueing. This acceleration is gated on an observation of
+the extent of that queue, so it does not engage where a shared path is
+congested. ABBA modifies window increase only: every loss and every ECN-CE mark
+produces the reduction that CUBIC specifies.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
 <section class="note rfcEditorRemove" id="section-note.1">
       <h2 id="name-discussion-venues">
