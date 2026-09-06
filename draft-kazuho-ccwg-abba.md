@@ -25,14 +25,13 @@ informative:
 --- abstract
 
 This document specifies ABBA, an extension to CUBIC congestion control for paths
-whose available bandwidth changes rapidly during a connection, where CUBIC's
-ordinary increase is too slow to follow it. While the round-trip time indicates
-a drained bottleneck queue, ABBA raises the congestion window faster than CUBIC
-would, adding a controlled amount of queueing. This acceleration is gated on an
-observation of the extent of that queue, so it does not engage where a shared
-path is congested. ABBA modifies window increase only: every loss and every
-ECN-CE mark produces the reduction that CUBIC specifies.
-
+whose available bandwidth changes rapidly during a connection, or that cause
+non-congestive loss. While the round-trip time indicates a drained bottleneck
+queue, ABBA raises the congestion window faster than CUBIC would, adding a
+controlled amount of queueing. This acceleration is gated on an observation of
+the extent of that queue, so it does not engage where a shared path is
+congested. ABBA modifies window increase only: every loss and every ECN-CE mark
+produces the reduction that CUBIC specifies.
 
 --- middle
 
