@@ -246,7 +246,7 @@ reduction at the time.
 
 Neither the weights nor the exclusion of the period in progress is incidental:
 together they are what keeps the estimator independent of the sender's own
-acceleration ({{no-ratchet}}).
+acceleration ({{fairness}}).
 
 
 ## Recalibration {#recalibrate}
@@ -297,28 +297,56 @@ described in {{full-rtt}}.
 
 # Properties
 
-## Acceleration Does Not Inflate Its Own Gate {#no-ratchet}
+## What Acceleration Can Take {#fairness}
 
-Where estimated_floor determines drain_threshold, acceleration requires
-latest_rtt to be below it, and cur_period_min is no greater than latest_rtt. The
-value fed into the estimator at the end of such a period is therefore below the
-estimate itself.
+Whether acceleration engages at all turns on the bottom and the top of the
+bottleneck queue being distinguishable.
 
-With a smoothed-value weight of 1/8, a variance weight of 1/4, and an estimated
-floor of the smoothed value less half the variance, feeding a sample below the
-current estimate lowers it, and feeding one above it does not lower it. These
-three quantities are related: writing the weights as `a` and `b` and the floor as
-`smoothed - k * variance`, the condition for a sample to lower the floor is
-exactly that the sample is below the floor when `a = b * (1 - k)`. The weights
-are therefore part of this property rather than free parameters.
+Where they are not — full_rtt within 10ms of min_rtt — the conditions in
+{{increase}} never hold and the sender behaves as CUBIC throughout. That is the
+case in which the delay signal could not separate a drained queue from an
+occupied one, and it is also the case, a shallow bottleneck buffer, in which
+acting on a misreading would cost a competing flow most.
 
-A period in which acceleration occurred consequently lowers the estimate, and a
-sender cannot widen the gate that permits acceleration by accelerating. A
-competing flow occupying the bottleneck does raise the estimate, since the minima
-it produces are genuine observations of the path; the second term of
-drain_threshold bounds the effect.
+Where they are distinguishable, acceleration can engage even while a competing
+flow occupies the bottleneck, since past_periods_min follows the minima that flow
+produces and the estimated floor rises with them. Four things bound what this
+permits:
 
-## A Sender Under Sustained Congestion Yields {#yield}
+* The estimated floor sits half a variance below the smoothed minima. The wider
+  those minima are spread, which is what competition produces, the further below
+  them the gate sits.
+
+* drain_threshold is capped at cur_period_min + 2ms whatever past_periods_min
+  holds, so acceleration never engages more than 2ms above the best round-trip
+  time of the period in progress.
+
+* The congestion window is the greater of the accelerated value and the one CUBIC
+  sets, so acceleration never slows the sender, and control returns to CUBIC's
+  curve as soon as the queue reforms.
+
+* The rate adds about 2ms of queueing per round-trip, against a range the
+  conditions require to exceed 10ms. With the round-trip of feedback delay, the
+  queue built stops at about 4.5ms: less than half the range the path has
+  demonstrated.
+
+Nor can the sender raise the gate by accelerating. Where estimated_floor
+determines drain_threshold, acceleration requires latest_rtt to be below it, and
+cur_period_min is no greater than latest_rtt; the value fed into the estimator at
+the end of such a period is therefore below the estimate itself. With a
+smoothed-value weight of 1/8, a variance weight of 1/4, and an estimated floor of
+the smoothed value less half the variance, feeding a sample below the current
+estimate lowers it. The three are related: writing the weights as `a` and `b` and
+the floor as `smoothed - k * variance`, the condition for a sample to lower the
+floor is exactly that the sample is below the floor when `a = b * (1 - k)`. The
+weights are therefore part of this property rather than free parameters.
+
+Recalibration cannot arm while the bottleneck is in use at all. A competing flow
+refilling the queue on its own congestion-avoidance trajectory produces a
+high-queue observation well inside twice expected_high_queue_interval, and each
+such observation restarts the interval.
+
+## Yielding under Sustained Congestion {#yield}
 
 ABBA modifies the increase of the congestion window only. Every lost packet and
 every ECN-CE mark produces the reduction the underlying controller specifies, and
