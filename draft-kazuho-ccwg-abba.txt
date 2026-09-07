@@ -71,20 +71,21 @@ Table of Contents
    1.  Introduction
      1.1.  Optimizing for Object Delivery
    2.  Conventions and Definitions
-   3.  Sender State
-   4.  Accelerated Increase
-   5.  Observing the Bottleneck Queue
-     5.1.  The Full-Queue Round-Trip Time
-     5.2.  Per-Period Minima
-     5.3.  Recalibration
-   6.  Properties
-     6.1.  What Acceleration Can Take
-     6.2.  Yielding under Sustained Congestion
-   7.  Security Considerations
-   8.  IANA Considerations
-   9.  References
-     9.1.  Normative References
-     9.2.  Informative References
+   3.  Overview
+   4.  Sender State
+   5.  Accelerated Increase
+   6.  Observing the Bottleneck Queue
+     6.1.  The Full-Queue Round-Trip Time
+     6.2.  Per-Period Minima
+     6.3.  Recalibration
+   7.  Properties
+     7.1.  What Acceleration Can Take
+     7.2.  Yielding under Sustained Congestion
+   8.  Security Considerations
+   9.  IANA Considerations
+   10. References
+     10.1.  Normative References
+     10.2.  Informative References
    Acknowledgments
    Author's Address
 
@@ -125,33 +126,8 @@ Table of Contents
       takes.  Where the available bandwidth increases faster than that,
       the sender does not fully utilize it.
 
-   This document specifies ABBA, which addresses the last of the three:
-   the rate at which the congestion window increases.  It combines two
-   elements: an accelerated increase of the congestion window, and an
-   observation of the extent of the bottleneck queue.
-
-   The accelerated increase engages while the round-trip time indicates
-   a drained bottleneck queue.  It adds a controlled amount of queueing
-   per round-trip, so that only a very shallow queue is built.  Once
-   that queue has formed, the round-trip time is no longer at its floor
-   and CUBIC's increase resumes.
-
-   To remain fair on congested paths that provide no isolation, the
-   bottom and the top of the bottleneck queue are observed.  The bottom
-   is the round-trip time floor the path has recently shown; the top is
-   the round-trip time when the queue is full.  Between them, the latest
-   round-trip time says how much of the queue is occupied.  Acceleration
-   is permitted only where the bottom and the top are distinguishable.
-
-   The top of the queue is observed during slow start, which overshoots
-   the capacity of the path and fills the bottleneck.  If the queue does
-   not return for long enough, then either nobody on the path, including
-   the sender itself, has been able to fill the available bandwidth, or
-   the characteristics of the path have changed.  In either case the
-   recorded value no longer describes the bottleneck, and the sender
-   returns to slow start to observe it again.  Doing so also recovers
-   bandwidth that the accelerated increase alone would not, as on paths
-   where loss is frequent.
+   This document specifies ABBA, which addresses the last of the three
+   by accelerating the increase of the congestion window.
 
    ABBA modifies window increase only.  It does not suppress, defer, or
    scale any congestion response: every lost packet and every ECN-CE
@@ -160,8 +136,8 @@ Table of Contents
    under sustained congestion the sender always yields, however the
    round-trip time signal may be misread.
 
-   The objective from which these choices follow, the delivery time of
-   an object, is set out below.
+   The following subsection sets out the objective ABBA is aimed at: the
+   delivery time of an object.
 
 1.1.  Optimizing for Object Delivery
 
@@ -226,7 +202,35 @@ Table of Contents
    BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
    capitals, as shown here.
 
-3.  Sender State
+3.  Overview
+
+   ABBA combines two elements: an accelerated increase of the congestion
+   window, and an observation of the extent of the bottleneck queue.
+
+   The accelerated increase engages while the round-trip time indicates
+   a drained bottleneck queue.  It adds a controlled amount of queueing
+   per round-trip, so that only a very shallow queue is built.  Once
+   that queue has formed, the round-trip time is no longer at its floor
+   and CUBIC's increase resumes.
+
+   To remain fair on congested paths that provide no isolation, the
+   bottom and the top of the bottleneck queue are observed.  The bottom
+   is the round-trip time floor the path has recently shown; the top is
+   the round-trip time when the queue is full.  Between them, the latest
+   round-trip time says how much of the queue is occupied.  Acceleration
+   is permitted only where the bottom and the top are distinguishable.
+
+   The top of the queue is observed during slow start, which overshoots
+   the capacity of the path and fills the bottleneck.  If the queue does
+   not return for long enough, then either nobody on the path, including
+   the sender itself, has been able to fill the available bandwidth, or
+   the characteristics of the path have changed.  In either case the
+   recorded value no longer describes the bottleneck, and the sender
+   returns to slow start to observe it again.  Doing so also recovers
+   bandwidth that the accelerated increase alone would not, as on paths
+   where loss is frequent.
+
+4.  Sender State
 
    An ABBA sender maintains the following state in addition to that of
    CUBIC:
@@ -274,7 +278,7 @@ bottom_rtt():
    reaction to the loss, and retracting it could only bring
    recalibration forward of the evidence for it.
 
-4.  Accelerated Increase
+5.  Accelerated Increase
 
    While the round-trip time indicates that the bottleneck queue has
    drained, the sender increases its congestion window faster than CUBIC
@@ -328,17 +332,17 @@ ratio():
 
    The upper bound holds one round-trip of acceleration to half of what
    would be needed to reverse a reduction, so that a sender under
-   sustained congestion yields; see Section 6.2.  A sender that reduces
+   sustained congestion yields; see Section 7.2.  A sender that reduces
    by a different factor when the signal is an ECN-CE mark uses that
    factor after such a mark.
 
-5.  Observing the Bottleneck Queue
+6.  Observing the Bottleneck Queue
 
    This section defines how full_rtt and the minima that bottom_rtt is
    built from are observed, and how full_rtt is retaken when it ceases
    to describe the path.
 
-5.1.  The Full-Queue Round-Trip Time
+6.1.  The Full-Queue Round-Trip Time
 
    Slow start overshoots the capacity of the path, so the queue is full
    when slow start ends.
@@ -360,15 +364,15 @@ ratio():
    still build a queue of roughly one idle RTT, their reaction being
    delayed by a round-trip over which the sender doubles its rate.
    full_rtt therefore comes out at about twice the idle RTT, and
-   satisfies the condition in Section 4 wherever that exceeds 10ms.  On
+   satisfies the condition in Section 5 wherever that exceeds 10ms.  On
    shorter paths the queue built may fall short, and acceleration does
    not engage.
 
-5.2.  Per-Period Minima
+6.2.  Per-Period Minima
 
    Two minima feed the gates: the lowest round-trip time of the period
    in progress, and an estimator over the minima of completed periods.
-   bottom_rtt and the drain threshold of Section 4 are placed from the
+   bottom_rtt and the drain threshold of Section 5 are placed from the
    estimator and bounded by the period in progress.
 
   on an rtt sample:
@@ -394,9 +398,9 @@ ratio():
 
    Neither the weights nor the exclusion of the period in progress is
    incidental: together they are what keeps the estimator independent of
-   the sender's own acceleration (Section 6.1).
+   the sender's own acceleration (Section 7.1).
 
-5.3.  Recalibration
+6.3.  Recalibration
 
    full_rtt describes the path as it was when the observation was taken.
    If the queue does not return for long enough, either nothing on the
@@ -446,17 +450,17 @@ expected_high_queue_interval():
 
    Retaining the congestion window leaves the sender probing from its
    current rate. full_rtt is retaken when the recovery that ends that
-   slow start exits, as described in Section 5.1.
+   slow start exits, as described in Section 6.1.
 
-6.  Properties
+7.  Properties
 
-6.1.  What Acceleration Can Take
+7.1.  What Acceleration Can Take
 
    Whether acceleration engages at all turns on the bottom and the top
    of the bottleneck queue being distinguishable.
 
    Where they are not — full_rtt within 10ms of bottom_rtt — the
-   conditions in Section 4 never hold and the sender behaves as CUBIC
+   conditions in Section 5 never hold and the sender behaves as CUBIC
    throughout.  That is the case in which the delay signal could not
    separate a drained queue from an occupied one, and it is also the
    case, a shallow bottleneck buffer, in which acting on a misreading
@@ -504,7 +508,7 @@ expected_high_queue_interval():
    expected_high_queue_interval, and each such observation restarts the
    interval.
 
-6.2.  Yielding under Sustained Congestion
+7.2.  Yielding under Sustained Congestion
 
    ABBA modifies the increase of the congestion window only.  Every lost
    packet and every ECN-CE mark produces the reduction the underlying
@@ -517,17 +521,17 @@ expected_high_queue_interval():
    signal is misleading therefore increases too quickly for a round-trip
    or two and then yields.
 
-7.  Security Considerations
+8.  Security Considerations
 
    TODO Security
 
-8.  IANA Considerations
+9.  IANA Considerations
 
    This document has no IANA actions.
 
-9.  References
+10.  References
 
-9.1.  Normative References
+10.1.  Normative References
 
    [CUBIC]    Xu, L., Ha, S., Rhee, I., Goel, V., and L. Eggert, Ed.,
               "CUBIC for Fast and Long-Distance Networks", RFC 9438,
@@ -543,7 +547,7 @@ expected_high_queue_interval():
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
 
-9.2.  Informative References
+10.2.  Informative References
 
    [CUBACK]   Oku, K., "CUBACK: CUBIC Driven by the ACK Clock", n.d.,
               <https://github.com/kazuho/draft-kazuho-ccwg-cuback>.
