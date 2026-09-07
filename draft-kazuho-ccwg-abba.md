@@ -79,10 +79,11 @@ that only a very shallow queue is built. Once that queue has formed, the
 round-trip time is no longer at its floor and CUBIC's increase resumes.
 
 To remain fair on congested paths that provide no isolation, the bottom and the
-top of the bottleneck queue are observed. The bottom is the minimum round-trip
-time on the path; the top is the round-trip time when the queue is full. Between
-them, the latest round-trip time says how much of the queue is occupied.
-Acceleration is permitted only where the bottom and the top are distinguishable.
+top of the bottleneck queue are observed. The bottom is the round-trip time
+floor the path has recently shown; the top is the round-trip time when the queue
+is full. Between them, the latest round-trip time says how much of the queue is
+occupied. Acceleration is permitted only where the bottom and the top are
+distinguishable.
 
 The top of the queue is observed during slow start, which overshoots the
 capacity of the path and fills the bottleneck. If the queue does not return for
@@ -133,6 +134,20 @@ transport. W_max, cwnd_epoch, C, alpha_cubic and beta_cubic are as defined in
 avoidance sets on an acknowledgement, whichever of its regions applies
 ({{Section 4.3 of !CUBIC}} through {{Section 4.5 of !CUBIC}}).
 
+min_rtt is the minimum over the lifetime of the connection, and so does not
+necessarily describe the round-trip time when the queue is empty; on a path whose
+characteristics change, as a mobile path does, the floor may since have moved.
+Tracking the mean and variance of the floor across completed periods gives a
+better estimate of where it now lies:
+
+~~~
+bottom_rtt():
+  floor = max(past_periods_min.smoothed - past_periods_min.variance, min_rtt)
+  if is_set(cur_period_min):
+    floor = min(floor, cur_period_min)
+  return floor
+~~~
+
 Where a congestion event is later determined to have been spurious
 ({{Section 4.9 of !CUBIC}}), the state above is restored to the values it held
 before that event, with one exception: last_high_queue_at is retained. It records
@@ -156,7 +171,7 @@ before that update.
 abba_cwnd(cwnd, cwnd_cubic):
   if congestion-window limited
       and is_set(past_periods_min)
-      and full_rtt > min_rtt + 10ms
+      and full_rtt > bottom_rtt() + 10ms
       and full_rtt > latest_rtt * 1.05
       and latest_rtt < drain_threshold():
     return max(cwnd_cubic, cwnd + segments_acked * ratio())
@@ -164,7 +179,10 @@ abba_cwnd(cwnd, cwnd_cubic):
 
 drain_threshold():
   estimated_floor = past_periods_min.smoothed - past_periods_min.variance / 2
-  return min(max(estimated_floor, min_rtt + 2ms), cur_period_min + 2ms)
+  threshold = max(estimated_floor, min_rtt + 2ms)
+  if is_set(cur_period_min):
+    threshold = min(threshold, cur_period_min + 2ms)
+  return threshold
 
 ratio():
   return min(max(2ms / drain_threshold(), 1/40), (1 / beta_cubic - 1) / 2)
@@ -195,11 +213,8 @@ signal is an ECN-CE mark uses that factor after such a mark.
 
 # Observing the Bottleneck Queue {#observe}
 
-Accelerated increase requires the sender to know both ends of the range the
-round-trip time takes on this path: the value when the bottleneck queue is empty,
-and the value when it is full. min_rtt supplies the former. This section defines
-how the latter is obtained, and how it is retaken when it ceases to describe the
-path.
+This section defines how full_rtt and the minima that bottom_rtt is built from
+are observed, and how full_rtt is retaken when it ceases to describe the path.
 
 ## The Full-Queue Round-Trip Time {#full-rtt}
 
@@ -221,19 +236,18 @@ value at the congestion event itself, lets the samples arriving during recovery
 contribute.
 
 Conservative variants of slow start, such as HyStart++ {{?HYSTART=RFC9406}},
-still build a queue of roughly one min_rtt, their reaction being delayed by a
+still build a queue of roughly one idle RTT, their reaction being delayed by a
 round-trip over which the sender doubles its rate. full_rtt therefore comes out
-at about twice min_rtt, which satisfies the condition in {{increase}} wherever
-min_rtt exceeds 10ms. On shorter paths the queue built may fall short of that,
-and acceleration does not engage.
+at about twice the idle RTT, and satisfies the condition in {{increase}} wherever
+that exceeds 10ms. On shorter paths the queue built may fall short, and
+acceleration does not engage.
 
 ## Per-Period Minima
 
-min_rtt is the lowest round-trip time of the whole connection, and may no longer
-describe a path whose floor has moved. The sender therefore also tracks the
-lowest round-trip time of the period in progress, which bounds the drain
-threshold of {{increase}}, and an estimate formed from the minima of completed
-periods, which places it.
+Two minima feed the gates: the lowest round-trip time of the period in progress,
+and an estimator over the minima of completed periods. bottom_rtt and the drain
+threshold of {{increase}} are placed from the estimator and bounded by the period
+in progress.
 
 ~~~
 on an rtt sample:
@@ -277,7 +291,7 @@ entering fast convergence once that slow start concludes
 ~~~
 on an rtt sample:
   if in congestion avoidance and congestion-window limited:
-    if smoothed_rtt >= (min_rtt + full_rtt) / 2:
+    if smoothed_rtt >= bottom_rtt() + 10ms:
       last_high_queue_at = now
     else if now - last_high_queue_at >= 2 * expected_high_queue_interval():
       recalibrate()
@@ -292,7 +306,7 @@ recalibrate():
 expected_high_queue_interval():
   K    = cbrt((cwnd_epoch / beta_cubic - cwnd_epoch) / C)
   reno = C * K^3 / alpha_cubic * full_rtt
-  return min(K, reno) * cbrt(full_rtt / min_rtt)
+  return min(K, reno) * cbrt(full_rtt / bottom_rtt())
 ~~~
 
 expected_high_queue_interval is the time a flow on the current
@@ -322,7 +336,7 @@ described in {{full-rtt}}.
 Whether acceleration engages at all turns on the bottom and the top of the
 bottleneck queue being distinguishable.
 
-Where they are not — full_rtt within 10ms of min_rtt — the conditions in
+Where they are not — full_rtt within 10ms of bottom_rtt — the conditions in
 {{increase}} never hold and the sender behaves as CUBIC throughout. That is the
 case in which the delay signal could not separate a drained queue from an
 occupied one, and it is also the case, a shallow bottleneck buffer, in which
@@ -337,9 +351,9 @@ permits:
   those minima are spread, which is what competition produces, the further below
   them the gate sits.
 
-* drain_threshold is capped at cur_period_min + 2ms whatever past_periods_min
-  holds, so acceleration never engages more than 2ms above the best round-trip
-  time of the period in progress.
+* Once a sample has been taken in the period in progress, drain_threshold is
+  capped at cur_period_min + 2ms whatever past_periods_min holds, so acceleration
+  never engages more than 2ms above the best round-trip time of that period.
 
 * The congestion window is the greater of the accelerated value and the one CUBIC
   sets, so acceleration never slows the sender, and control returns to CUBIC's
