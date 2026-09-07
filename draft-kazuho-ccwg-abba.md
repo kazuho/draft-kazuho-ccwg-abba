@@ -135,12 +135,13 @@ growth beyond that of the underlying congestion-avoidance algorithm.
 Recalibration provides a further opportunity to restore utilization when the
 accelerated increase alone is insufficient.
 
-Evaluation of such paths is often done by dropping packets independently at a
-fixed probability. Loss on a radio path is not independent: it arrives in the
-bursts described above, and a burst is more or less a single congestion event
-rather than a series of them. What determines delivery time is therefore not the
-drop rate but how many congestion events those drops trigger, and how quickly
-the window recovers afterwards.
+Drops on such paths are commonly reported as a packet loss ratio. They do not
+occur at random: they arrive in the bursts described above, and a burst is more
+or less a single congestion event rather than a series of them. What determines
+delivery time is therefore not the packet loss ratio but the number of
+congestion events those drops trigger, and how quickly the window recovers after
+each. That number is far smaller than the ratio suggests under a random loss
+model.
 
 The relative contribution of each mechanism depends on the transfer. An object
 delivered during initial startup can benefit from Rapid Start without invoking
