@@ -133,6 +133,12 @@ transport. W_max, cwnd_epoch, C, alpha_cubic and beta_cubic are as defined in
 avoidance sets on an acknowledgement, whichever of its regions applies
 ({{Section 4.3 of !CUBIC}} through {{Section 4.5 of !CUBIC}}).
 
+Where a congestion event is later determined to have been spurious
+({{Section 4.9 of !CUBIC}}), the state above is restored to the values it held
+before that event, with one exception: last_high_queue_at is retained. It records
+an observation of the path rather than a reaction to the loss, and retracting it
+could only bring recalibration forward of the evidence for it.
+
 
 # Accelerated Increase {#increase}
 
