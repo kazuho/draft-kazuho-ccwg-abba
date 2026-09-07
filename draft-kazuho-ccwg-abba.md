@@ -112,7 +112,7 @@ ABBA complements Rapid Start {{?I-D.kazuho-ccwg-rapid-start}} and Cuback
 objects by accelerating initial bandwidth acquisition, convergence toward a share
 of a busy bottleneck, and renewed growth when the congestion window leaves
 available capacity unused. Their complementary roles are discussed in
-{{http-delivery}}.
+{{object-delivery}}.
 
 
 # Conventions and Definitions
@@ -406,7 +406,7 @@ signal can arrive. A sender whose round-trip time signal is misleading therefore
 increases too quickly for a round-trip or two and then yields.
 
 
-# HTTP Object Delivery {#http-delivery}
+# Optimizing for Object Delivery {#object-delivery}
 
 A finite transfer benefits from available bandwidth only while it has data left
 to send. Time spent acquiring that bandwidth can therefore account for a
@@ -441,6 +441,16 @@ delivered during initial startup can benefit from Rapid Start without invoking
 either congestion-avoidance mechanism. Objects that extend into congestion
 avoidance, or that are delivered over an established connection, can benefit from
 faster acquisition of a bandwidth share and recovery from underutilization.
+
+Low queueing delay is another objective a congestion controller may be optimized
+for. However, when the data of an object is already available at the sender,
+withholding it to keep the bottleneck queue short does not remove the wait; it
+changes where the data waits. What withholding does reduce is the pressure the
+sender places on competing flows to yield, which would prolong bandwidth
+acquisition and consequently object delivery. The primary application of the
+three specifications is object delivery, and therefore they accept queueing in
+pursuit of earlier delivery rather than treating the lowest round-trip time as
+the objective.
 
 
 # Security Considerations {#security}
