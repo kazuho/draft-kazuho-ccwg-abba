@@ -78,7 +78,7 @@ Table of Contents
    6.  Properties
      6.1.  What Acceleration Can Take
      6.2.  Yielding under Sustained Congestion
-   7.  HTTP Object Delivery
+   7.  Optimizing for Object Delivery
    8.  Security Considerations
    9.  IANA Considerations
    10. References
@@ -465,7 +465,7 @@ expected_high_queue_interval():
    signal is misleading therefore increases too quickly for a round-trip
    or two and then yields.
 
-7.  HTTP Object Delivery
+7.  Optimizing for Object Delivery
 
    A finite transfer benefits from available bandwidth only while it has
    data left to send.  Time spent acquiring that bandwidth can therefore
@@ -505,6 +505,17 @@ expected_high_queue_interval():
    Objects that extend into congestion avoidance, or that are delivered
    over an established connection, can benefit from faster acquisition
    of a bandwidth share and recovery from underutilization.
+
+   Low queueing delay is another objective a congestion controller may
+   be optimized for.  However, when the data of an object is already
+   available at the sender, withholding it to keep the bottleneck queue
+   short does not remove the wait; it changes where the data waits.
+   What withholding does reduce is the pressure the sender places on
+   competing flows to yield, which would prolong bandwidth acquisition
+   and consequently object delivery.  The primary application of the
+   three specifications is object delivery, and therefore they accept
+   queueing in pursuit of earlier delivery rather than treating the
+   lowest round-trip time as the objective.
 
 8.  Security Considerations
 
