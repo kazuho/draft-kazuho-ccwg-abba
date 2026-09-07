@@ -4,8 +4,8 @@
 
 Congestion Control Working Group                        奥 一穂 (K. Oku)
 Internet-Draft                                                    Fastly
-Intended status: Standards Track                        6 September 2026
-Expires: 10 March 2027
+Intended status: Standards Track                        7 September 2026
+Expires: 11 March 2027
 
 
            Accelerated Bottleneck Bandwidth Adaptation (ABBA)
@@ -49,7 +49,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 10 March 2027.
+   This Internet-Draft will expire on 11 March 2027.
 
 Copyright Notice
 
@@ -193,6 +193,13 @@ Table of Contents
    congestion window that CUBIC's congestion avoidance sets on an
    acknowledgement, whichever of its regions applies (Section 4.3 of
    [CUBIC] through Section 4.5 of [CUBIC]).
+
+   Where a congestion event is later determined to have been spurious
+   (Section 4.9 of [CUBIC]), the state above is restored to the values
+   it held before that event, with one exception: last_high_queue_at is
+   retained.  It records an observation of the path rather than a
+   reaction to the loss, and retracting it could only bring
+   recalibration forward of the evidence for it.
 
 4.  Accelerated Increase
 
