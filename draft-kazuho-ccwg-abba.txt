@@ -78,11 +78,12 @@ Table of Contents
    6.  Properties
      6.1.  What Acceleration Can Take
      6.2.  Yielding under Sustained Congestion
-   7.  Security Considerations
-   8.  IANA Considerations
-   9.  References
-     9.1.  Normative References
-     9.2.  Informative References
+   7.  HTTP Object Delivery
+   8.  Security Considerations
+   9.  IANA Considerations
+   10. References
+     10.1.  Normative References
+     10.2.  Informative References
    Acknowledgments
    Author's Address
 
@@ -136,10 +137,10 @@ Table of Contents
 
    To remain fair on congested paths that provide no isolation, the
    bottom and the top of the bottleneck queue are observed.  The bottom
-   is the minimum round-trip time on the path; the top is the round-trip
-   time when the queue is full.  Between them, the latest round-trip
-   time says how much of the queue is occupied.  Acceleration is
-   permitted only where the bottom and the top are distinguishable.
+   is the round-trip time floor the path has recently shown; the top is
+   the round-trip time when the queue is full.  Between them, the latest
+   round-trip time says how much of the queue is occupied.  Acceleration
+   is permitted only where the bottom and the top are distinguishable.
 
    The top of the queue is observed during slow start, which overshoots
    the capacity of the path and fills the bottleneck.  If the queue does
@@ -157,6 +158,13 @@ Table of Contents
    accelerated increase is in turn bounded below that reduction, so
    under sustained congestion the sender always yields, however the
    round-trip time signal may be misread.
+
+   ABBA complements Rapid Start [I-D.kazuho-ccwg-rapid-start] and Cuback
+   [CUBACK].  Together, these mechanisms aim to reduce the delivery time
+   of HTTP objects by accelerating initial bandwidth acquisition,
+   convergence toward a share of a busy bottleneck, and renewed growth
+   when the congestion window leaves available capacity unused.  Their
+   complementary roles are discussed in Section 7.
 
 2.  Conventions and Definitions
 
@@ -194,6 +202,19 @@ Table of Contents
    acknowledgement, whichever of its regions applies (Section 4.3 of
    [CUBIC] through Section 4.5 of [CUBIC]).
 
+   min_rtt is the minimum over the lifetime of the connection, and so
+   does not necessarily describe the round-trip time when the queue is
+   empty; on a path whose characteristics change, as a mobile path does,
+   the floor may since have moved.  Tracking the mean and variance of
+   the floor across completed periods gives a better estimate of where
+   it now lies:
+
+bottom_rtt():
+  floor = max(past_periods_min.smoothed - past_periods_min.variance, min_rtt)
+  if is_set(cur_period_min):
+    floor = min(floor, cur_period_min)
+  return floor
+
    Where a congestion event is later determined to have been spurious
    (Section 4.9 of [CUBIC]), the state above is restored to the values
    it held before that event, with one exception: last_high_queue_at is
@@ -217,7 +238,7 @@ Table of Contents
 abba_cwnd(cwnd, cwnd_cubic):
   if congestion-window limited
       and is_set(past_periods_min)
-      and full_rtt > min_rtt + 10ms
+      and full_rtt > bottom_rtt() + 10ms
       and full_rtt > latest_rtt * 1.05
       and latest_rtt < drain_threshold():
     return max(cwnd_cubic, cwnd + segments_acked * ratio())
@@ -225,7 +246,10 @@ abba_cwnd(cwnd, cwnd_cubic):
 
 drain_threshold():
   estimated_floor = past_periods_min.smoothed - past_periods_min.variance / 2
-  return min(max(estimated_floor, min_rtt + 2ms), cur_period_min + 2ms)
+  threshold = max(estimated_floor, min_rtt + 2ms)
+  if is_set(cur_period_min):
+    threshold = min(threshold, cur_period_min + 2ms)
+  return threshold
 
 ratio():
   return min(max(2ms / drain_threshold(), 1/40), (1 / beta_cubic - 1) / 2)
@@ -258,11 +282,9 @@ ratio():
 
 5.  Observing the Bottleneck Queue
 
-   Accelerated increase requires the sender to know both ends of the
-   range the round-trip time takes on this path: the value when the
-   bottleneck queue is empty, and the value when it is full. min_rtt
-   supplies the former.  This section defines how the latter is
-   obtained, and how it is retaken when it ceases to describe the path.
+   This section defines how full_rtt and the minima that bottom_rtt is
+   built from are observed, and how full_rtt is retaken when it ceases
+   to describe the path.
 
 5.1.  The Full-Queue Round-Trip Time
 
@@ -283,21 +305,19 @@ ratio():
    contribute.
 
    Conservative variants of slow start, such as HyStart++ [HYSTART],
-   still build a queue of roughly one min_rtt, their reaction being
+   still build a queue of roughly one idle RTT, their reaction being
    delayed by a round-trip over which the sender doubles its rate.
-   full_rtt therefore comes out at about twice min_rtt, which satisfies
-   the condition in Section 4 wherever min_rtt exceeds 10ms.  On shorter
-   paths the queue built may fall short of that, and acceleration does
+   full_rtt therefore comes out at about twice the idle RTT, and
+   satisfies the condition in Section 4 wherever that exceeds 10ms.  On
+   shorter paths the queue built may fall short, and acceleration does
    not engage.
 
 5.2.  Per-Period Minima
 
-   min_rtt is the lowest round-trip time of the whole connection, and
-   may no longer describe a path whose floor has moved.  The sender
-   therefore also tracks the lowest round-trip time of the period in
-   progress, which bounds the drain threshold of Section 4, and an
-   estimate formed from the minima of completed periods, which places
-   it.
+   Two minima feed the gates: the lowest round-trip time of the period
+   in progress, and an estimator over the minima of completed periods.
+   bottom_rtt and the drain threshold of Section 4 are placed from the
+   estimator and bounded by the period in progress.
 
   on an rtt sample:
     if taken outside a recovery period
@@ -338,7 +358,7 @@ ratio():
 
 on an rtt sample:
   if in congestion avoidance and congestion-window limited:
-    if smoothed_rtt >= (min_rtt + full_rtt) / 2:
+    if smoothed_rtt >= bottom_rtt() + 10ms:
       last_high_queue_at = now
     else if now - last_high_queue_at >= 2 * expected_high_queue_interval():
       recalibrate()
@@ -353,7 +373,7 @@ recalibrate():
 expected_high_queue_interval():
   K    = cbrt((cwnd_epoch / beta_cubic - cwnd_epoch) / C)
   reno = C * K^3 / alpha_cubic * full_rtt
-  return min(K, reno) * cbrt(full_rtt / min_rtt)
+  return min(K, reno) * cbrt(full_rtt / bottom_rtt())
 
    expected_high_queue_interval is the time a flow on the current
    congestion-avoidance trajectory would take to refill the queue.  Both
@@ -383,12 +403,12 @@ expected_high_queue_interval():
    Whether acceleration engages at all turns on the bottom and the top
    of the bottleneck queue being distinguishable.
 
-   Where they are not — full_rtt within 10ms of min_rtt — the conditions
-   in Section 4 never hold and the sender behaves as CUBIC throughout.
-   That is the case in which the delay signal could not separate a
-   drained queue from an occupied one, and it is also the case, a
-   shallow bottleneck buffer, in which acting on a misreading would cost
-   a competing flow most.
+   Where they are not — full_rtt within 10ms of bottom_rtt — the
+   conditions in Section 4 never hold and the sender behaves as CUBIC
+   throughout.  That is the case in which the delay signal could not
+   separate a drained queue from an occupied one, and it is also the
+   case, a shallow bottleneck buffer, in which acting on a misreading
+   would cost a competing flow most.
 
    Where they are distinguishable, acceleration can engage even while a
    competing flow occupies the bottleneck, since past_periods_min
@@ -399,9 +419,10 @@ expected_high_queue_interval():
       minima.  The wider those minima are spread, which is what
       competition produces, the further below them the gate sits.
 
-   *  drain_threshold is capped at cur_period_min + 2ms whatever
+   *  Once a sample has been taken in the period in progress,
+      drain_threshold is capped at cur_period_min + 2ms whatever
       past_periods_min holds, so acceleration never engages more than
-      2ms above the best round-trip time of the period in progress.
+      2ms above the best round-trip time of that period.
 
    *  The congestion window is the greater of the accelerated value and
       the one CUBIC sets, so acceleration never slows the sender, and
@@ -444,17 +465,57 @@ expected_high_queue_interval():
    signal is misleading therefore increases too quickly for a round-trip
    or two and then yields.
 
-7.  Security Considerations
+7.  HTTP Object Delivery
+
+   A finite transfer benefits from available bandwidth only while it has
+   data left to send.  Time spent acquiring that bandwidth can therefore
+   account for a substantial part of its completion time, even if the
+   congestion controller would eventually reach the same steady-state
+   rate.
+
+   Rapid Start, Cuback, and ABBA address different parts of this
+   acquisition.  Rapid Start accelerates the initial expansion of the
+   congestion window and controls the transition into congestion
+   avoidance.  Cuback governs subsequent growth, including convergence
+   when a flow competes with traffic already occupying the bottleneck.
+   As the flow gains service, its ACK-driven progression can advance
+   faster than the wall-clock progression of CUBIC.  This effect does
+   not require the bottleneck queue to drain.
+
+   ABBA complements these mechanisms when the congestion window becomes
+   insufficient to use the available bandwidth.  This can occur after an
+   increase in capacity, the departure of competing traffic, or a window
+   reduction in response to non-congestive loss.  Where the RTT
+   observations permit it, ABBA accelerates growth beyond that of the
+   underlying congestion-avoidance algorithm.  Recalibration provides a
+   further opportunity to restore utilization when the accelerated
+   increase alone is insufficient.
+
+   Evaluation of such paths is often done by dropping packets
+   independently at a fixed probability.  Loss on a radio path is not
+   independent: it arrives in the bursts described in Section 1, and a
+   burst is more or less a single congestion event rather than a series
+   of them.  What determines delivery time is therefore not the drop
+   rate but how quickly the window is recovered afterwards.
+
+   The relative contribution of each mechanism depends on the transfer.
+   An object delivered during initial startup can benefit from Rapid
+   Start without invoking either congestion-avoidance mechanism.
+   Objects that extend into congestion avoidance, or that are delivered
+   over an established connection, can benefit from faster acquisition
+   of a bandwidth share and recovery from underutilization.
+
+8.  Security Considerations
 
    TODO Security
 
-8.  IANA Considerations
+9.  IANA Considerations
 
    This document has no IANA actions.
 
-9.  References
+10.  References
 
-9.1.  Normative References
+10.1.  Normative References
 
    [CUBIC]    Xu, L., Ha, S., Rhee, I., Goel, V., and L. Eggert, Ed.,
               "CUBIC for Fast and Long-Distance Networks", RFC 9438,
@@ -470,7 +531,10 @@ expected_high_queue_interval():
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
 
-9.2.  Informative References
+10.2.  Informative References
+
+   [CUBACK]   Oku, K., "CUBACK: CUBIC Driven by the ACK Clock", n.d.,
+              <https://github.com/kazuho/draft-kazuho-ccwg-cuback>.
 
    [ECN]      Ramakrishnan, K., Floyd, S., and D. Black, "The Addition
               of Explicit Congestion Notification (ECN) to IP",
@@ -481,6 +545,12 @@ expected_high_queue_interval():
               Modified Slow Start for TCP", RFC 9406,
               DOI 10.17487/RFC9406, May 2023,
               <https://www.rfc-editor.org/rfc/rfc9406>.
+
+   [I-D.kazuho-ccwg-rapid-start]
+              Oku, K., "Rapid Startup of Congestion Control", Work in
+              Progress, Internet-Draft, draft-kazuho-ccwg-rapid-start-
+              02, 15 March 2026, <https://datatracker.ietf.org/doc/html/
+              draft-kazuho-ccwg-rapid-start-02>.
 
 Acknowledgments
 
