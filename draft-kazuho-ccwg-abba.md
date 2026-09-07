@@ -19,6 +19,13 @@ author:
 normative:
 
 informative:
+  CUBACK:
+    title: "CUBACK: CUBIC Driven by the ACK Clock"
+    target: https://github.com/kazuho/draft-kazuho-ccwg-cuback
+    author:
+      -
+        ins: K. Oku
+        name: Kazuho Oku
 
 ...
 
@@ -99,6 +106,13 @@ congestion response: every lost packet and every ECN-CE mark {{?ECN=RFC3168}}
 produces the reduction that CUBIC specifies. The accelerated increase is in turn
 bounded below that reduction, so under sustained congestion the sender always
 yields, however the round-trip time signal may be misread.
+
+ABBA complements Rapid Start {{?I-D.kazuho-ccwg-rapid-start}} and Cuback
+{{CUBACK}}. Together, these mechanisms aim to reduce the delivery time of HTTP
+objects by accelerating initial bandwidth acquisition, convergence toward a share
+of a busy bottleneck, and renewed growth when the congestion window leaves
+available capacity unused. Their complementary roles are discussed in
+{{http-delivery}}.
 
 
 # Conventions and Definitions
@@ -390,6 +404,42 @@ Because ratio is capped at half of what would reverse a reduction over one
 round-trip, a sender cannot recover a reduction before a further congestion
 signal can arrive. A sender whose round-trip time signal is misleading therefore
 increases too quickly for a round-trip or two and then yields.
+
+
+# HTTP Object Delivery {#http-delivery}
+
+A finite transfer benefits from available bandwidth only while it has data left
+to send. Time spent acquiring that bandwidth can therefore account for a
+substantial part of its completion time, even if the congestion controller would
+eventually reach the same steady-state rate.
+
+Rapid Start, Cuback, and ABBA address different parts of this acquisition. Rapid
+Start accelerates the initial expansion of the congestion window and controls the
+transition into congestion avoidance. Cuback governs subsequent growth, including
+convergence when a flow competes with traffic already occupying the bottleneck.
+As the flow gains service, its ACK-driven progression can advance faster than the
+wall-clock progression of CUBIC. This effect does not require the bottleneck
+queue to drain.
+
+ABBA complements these mechanisms when the congestion window becomes insufficient
+to use the available bandwidth. This can occur after an increase in capacity, the
+departure of competing traffic, or a window reduction in response to
+non-congestive loss. Where the RTT observations permit it, ABBA accelerates
+growth beyond that of the underlying congestion-avoidance algorithm.
+Recalibration provides a further opportunity to restore utilization when the
+accelerated increase alone is insufficient.
+
+Evaluation of such paths is often done by dropping packets independently at a
+fixed probability. Loss on a radio path is not independent: it arrives in the
+bursts described in {{intro}}, and a burst is more or less a single congestion
+event rather than a series of them. What determines delivery time is therefore
+not the drop rate but how quickly the window is recovered afterwards.
+
+The relative contribution of each mechanism depends on the transfer. An object
+delivered during initial startup can benefit from Rapid Start without invoking
+either congestion-avoidance mechanism. Objects that extend into congestion
+avoidance, or that are delivered over an established connection, can benefit from
+faster acquisition of a bandwidth share and recovery from underutilization.
 
 
 # Security Considerations {#security}
