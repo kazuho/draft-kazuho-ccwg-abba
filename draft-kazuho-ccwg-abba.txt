@@ -70,7 +70,7 @@ Table of Contents
    1.  Introduction
      1.1.  Optimizing for Object Delivery
    2.  Conventions and Definitions
-   3.  Overview
+   3.  Sender State
    4.  Accelerated Increase
    5.  Observing the Bottleneck Queue
      5.1.  The Full-Queue Round-Trip Time
@@ -225,7 +225,7 @@ Table of Contents
    BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
    capitals, as shown here.
 
-3.  Overview
+3.  Sender State
 
    An ABBA sender maintains the following state in addition to that of
    CUBIC:
