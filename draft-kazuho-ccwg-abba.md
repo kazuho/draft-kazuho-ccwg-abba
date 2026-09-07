@@ -75,31 +75,8 @@ CUBIC reacts to this in three ways:
   bandwidth-delay product, the longer that takes. Where the available bandwidth
   increases faster than that, the sender does not fully utilize it.
 
-This document specifies ABBA, which addresses the last of the three: the rate at
-which the congestion window increases. It combines two elements: an accelerated
-increase of the congestion window, and an observation of the extent of the
-bottleneck queue.
-
-The accelerated increase engages while the round-trip time indicates a drained
-bottleneck queue. It adds a controlled amount of queueing per round-trip, so
-that only a very shallow queue is built. Once that queue has formed, the
-round-trip time is no longer at its floor and CUBIC's increase resumes.
-
-To remain fair on congested paths that provide no isolation, the bottom and the
-top of the bottleneck queue are observed. The bottom is the round-trip time
-floor the path has recently shown; the top is the round-trip time when the queue
-is full. Between them, the latest round-trip time says how much of the queue is
-occupied. Acceleration is permitted only where the bottom and the top are
-distinguishable.
-
-The top of the queue is observed during slow start, which overshoots the
-capacity of the path and fills the bottleneck. If the queue does not return for
-long enough, then either nobody on the path, including the sender itself, has
-been able to fill the available bandwidth, or the characteristics of the path
-have changed. In either case the recorded value no longer describes the
-bottleneck, and the sender returns to slow start to observe it again. Doing so
-also recovers bandwidth that the accelerated increase alone would not, as on
-paths where loss is frequent.
+This document specifies ABBA, which addresses the last of the three by
+accelerating the increase of the congestion window.
 
 ABBA modifies window increase only. It does not suppress, defer, or scale any
 congestion response: every lost packet and every ECN-CE mark {{?ECN=RFC3168}}
@@ -107,8 +84,8 @@ produces the reduction that CUBIC specifies. The accelerated increase is in turn
 bounded below that reduction, so under sustained congestion the sender always
 yields, however the round-trip time signal may be misread.
 
-The objective from which these choices follow, the delivery time of an object, is
-set out below.
+The following subsection sets out the objective ABBA is aimed at: the delivery
+time of an object.
 
 ## Optimizing for Object Delivery {#object-delivery}
 
@@ -163,6 +140,33 @@ the objective.
 # Conventions and Definitions
 
 {::boilerplate bcp14-tagged}
+
+
+# Overview {#overview}
+
+ABBA combines two elements: an accelerated increase of the congestion window,
+and an observation of the extent of the bottleneck queue.
+
+The accelerated increase engages while the round-trip time indicates a drained
+bottleneck queue. It adds a controlled amount of queueing per round-trip, so
+that only a very shallow queue is built. Once that queue has formed, the
+round-trip time is no longer at its floor and CUBIC's increase resumes.
+
+To remain fair on congested paths that provide no isolation, the bottom and the
+top of the bottleneck queue are observed. The bottom is the round-trip time
+floor the path has recently shown; the top is the round-trip time when the queue
+is full. Between them, the latest round-trip time says how much of the queue is
+occupied. Acceleration is permitted only where the bottom and the top are
+distinguishable.
+
+The top of the queue is observed during slow start, which overshoots the
+capacity of the path and fills the bottleneck. If the queue does not return for
+long enough, then either nobody on the path, including the sender itself, has
+been able to fill the available bandwidth, or the characteristics of the path
+have changed. In either case the recorded value no longer describes the
+bottleneck, and the sender returns to slow start to observe it again. Doing so
+also recovers bandwidth that the accelerated increase alone would not, as on
+paths where loss is frequent.
 
 
 # Sender State {#state}
