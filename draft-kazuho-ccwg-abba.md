@@ -33,12 +33,12 @@ informative:
 
 This document specifies ABBA, an extension to CUBIC congestion control for paths
 whose available bandwidth changes rapidly during a connection, or that cause
-non-congestive loss. While the round-trip time indicates a drained bottleneck
-queue, ABBA raises the congestion window faster than CUBIC would, adding a
-controlled amount of queueing. This acceleration is gated on an observation of
-the extent of that queue, so it does not engage where a shared path is
-congested. ABBA modifies window increase only: every loss and every ECN-CE mark
-produces the reduction that CUBIC specifies.
+non-congestive loss. When round-trip-time observations indicate a drained
+bottleneck queue and sufficient headroom, ABBA permits window growth faster than
+CUBIC would, adding a controlled amount of queueing. If the path appears
+underutilized for too long, ABBA returns to slow start to refresh its
+observations and restore utilization. ABBA modifies window increase only: every
+loss and every ECN-CE mark produces the reduction that CUBIC specifies.
 
 --- middle
 
