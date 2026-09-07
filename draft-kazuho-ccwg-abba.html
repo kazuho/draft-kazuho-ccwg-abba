@@ -1264,8 +1264,8 @@ increases faster than that, the sender does not fully utilize it.<a href="#secti
       </ul>
 <p id="section-1-5">This document specifies ABBA, which addresses the last of the three by
 accelerating the increase of the congestion window while the bottleneck queue is
-observed to be drained, and by recalibrating that observation when the queue is
-no longer seen.<a href="#section-1-5" class="pilcrow">¶</a></p>
+observed to be drained, and by recalibrating its queue observations when the
+queue fails to return for long enough.<a href="#section-1-5" class="pilcrow">¶</a></p>
 <p id="section-1-6">ABBA modifies window increase only. It does not suppress, defer, or scale any
 congestion response: every lost packet and every ECN-CE mark <span>[<a href="#ECN" class="cite xref">ECN</a>]</span>
 produces the reduction that CUBIC specifies. The accelerated increase is in turn
