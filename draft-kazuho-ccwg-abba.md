@@ -433,7 +433,8 @@ Evaluation of such paths is often done by dropping packets independently at a
 fixed probability. Loss on a radio path is not independent: it arrives in the
 bursts described in {{intro}}, and a burst is more or less a single congestion
 event rather than a series of them. What determines delivery time is therefore
-not the drop rate but how quickly the window is recovered afterwards.
+not the drop rate but how many congestion events those drops trigger, and how
+quickly the window recovers afterwards.
 
 The relative contribution of each mechanism depends on the transfer. An object
 delivered during initial startup can benefit from Rapid Start without invoking
