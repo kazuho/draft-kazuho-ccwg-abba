@@ -1648,7 +1648,8 @@ accelerated increase alone is insufficient.<a href="#section-7-3" class="pilcrow
 fixed probability. Loss on a radio path is not independent: it arrives in the
 bursts described in <a href="#intro" class="auto internal xref">Section 1</a>, and a burst is more or less a single congestion
 event rather than a series of them. What determines delivery time is therefore
-not the drop rate but how quickly the window is recovered afterwards.<a href="#section-7-4" class="pilcrow">¶</a></p>
+not the drop rate but how many congestion events those drops trigger, and how
+quickly the window recovers afterwards.<a href="#section-7-4" class="pilcrow">¶</a></p>
 <p id="section-7-5">The relative contribution of each mechanism depends on the transfer. An object
 delivered during initial startup can benefit from Rapid Start without invoking
 either congestion-avoidance mechanism. Objects that extend into congestion
