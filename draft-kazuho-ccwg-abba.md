@@ -77,8 +77,8 @@ CUBIC reacts to this in three ways:
 
 This document specifies ABBA, which addresses the last of the three by
 accelerating the increase of the congestion window while the bottleneck queue is
-observed to be drained, and by recalibrating that observation when the queue is
-no longer seen.
+observed to be drained, and by recalibrating its queue observations when the
+queue fails to return for long enough.
 
 ABBA modifies window increase only. It does not suppress, defer, or scale any
 congestion response: every lost packet and every ECN-CE mark {{?ECN=RFC3168}}
