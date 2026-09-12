@@ -192,6 +192,10 @@ last_high_queue_at:
 : The time at which the bottleneck queue was most recently observed to be
   substantially occupied.
 
+bytes_accelerated:
+: The part of the congestion window's growth since the most recent congestion
+  event that accelerated increase contributed.
+
 The sender also uses min_rtt, the lowest round-trip time observed over the
 lifetime of the connection, and latest_rtt and smoothed_rtt as maintained by the
 transport. W_max, cwnd_epoch, C, alpha_cubic and beta_cubic are as defined in
@@ -239,7 +243,10 @@ abba_cwnd(cwnd, cwnd_cubic):
       and full_rtt > bottom_rtt() + 10ms
       and full_rtt > latest_rtt * 1.05
       and latest_rtt < drain_threshold():
-    return max(cwnd_cubic, cwnd + segments_acked * ratio())
+    accelerated = cwnd + segments_acked * ratio()
+    if accelerated > cwnd_cubic:
+      bytes_accelerated += accelerated - cwnd
+      return accelerated
   return cwnd_cubic
 
 drain_threshold():
@@ -344,29 +351,48 @@ acceleration ({{fairness}}).
 
 ## Recalibration {#recalibrate}
 
-full_rtt describes the path as it was when the observation was taken. If the
-queue does not return for long enough, either nothing on the path, including the
-sender itself, has been able to fill the available bandwidth, or the
-characteristics of the path have changed. In both cases the observation is
-retaken: the sender returns to slow start, with no slow start threshold and its
-congestion window unchanged. W_max is cleared, to prevent the sender from
-entering fast convergence once that slow start concludes
-({{Section 4.7 of !CUBIC}}).
+Acceleration needs both ends of the bottleneck queue to be visible
+({{increase}}). The top — full_rtt — is an observation, so it holds only for the
+path as it stood when it was taken. It can be wrong in three ways: nothing on
+the path, the sender included, has been filling the available bandwidth; the
+path has changed; or the slow start that produced it ended before the queue
+filled. The sender retakes it when no high-queue observation has been made for
+long enough.
+
+The sender returns to slow start with no slow start threshold, retaining its
+congestion window so that it probes upward from the rate it currently holds.
+W_max is cleared, to prevent the sender from entering fast convergence once that
+slow start concludes ({{Section 4.7 of !CUBIC}}).
 
 ~~~
 on an rtt sample:
   if in congestion avoidance and congestion-window limited:
     if smoothed_rtt >= bottom_rtt() + 10ms:
       last_high_queue_at = now
-    else if now - last_high_queue_at >= 2 * expected_high_queue_interval():
+    else if now - last_high_queue_at >= recalibration_interval():
       recalibrate()
 
 on an ECN-CE mark:               # including one received during recovery
   last_high_queue_at = now
 
+on a congestion event:
+  bytes_accelerated = 0
+  if in the slow start begun by recalibrate():
+    cwnd  = cwnd * beta_recalibration  # a different beta for the reduction
+    W_max = cwnd
+
+beta_recalibration = 1 / (2 * (2 - beta_cubic))
+
 recalibrate():
   W_max    = unset
   ssthresh = infinity            # cwnd is retained
+
+recalibration_interval():
+  if full_rtt > bottom_rtt() + 10ms:
+    if bytes_accelerated < cwnd * (1 - beta_cubic) / 4:
+      return infinity
+    return 2 * expected_high_queue_interval()
+  return 8 * expected_high_queue_interval()
 
 expected_high_queue_interval():
   K    = cbrt((cwnd_epoch / beta_cubic - cwnd_epoch) / C)
@@ -385,18 +411,35 @@ losses to refresh the timestamp, frequent random loss on a drained path would
 restart the interval indefinitely and recalibration could never arm on the paths
 it exists for.
 
-Twice the interval is used so that a competing flow refilling the queue on its
-own trajectory refreshes the observation well within the window. Recalibration
-therefore does not occur while any flow is making use of the bottleneck.
+Where full_rtt clears the high-queue threshold, accelerated increase can engage,
+and the sender requires it to have recovered a quarter of the last reduction
+before recalibrating. It engages only while the round-trip time is at the bottom
+of the queue ({{increase}}), so a period in which it materially gained is what
+indicates the bottleneck may be underutilized. The wait is two expected
+intervals, long enough for a competing flow refilling the queue on its own
+congestion-avoidance trajectory to refresh the observation.
 
-Retaining the congestion window leaves the sender probing from its current rate.
+Where full_rtt does not clear that threshold, neither condition holds up:
+acceleration never engages, so the gain is unavailable, and the absence of a
+high-queue observation no longer separates an unused bottleneck from one whose
+queue never reaches the threshold. Recalibration rests on the interval alone.
+Since the probe overflows the queue, imposing a congestion event on any other
+flow using the bottleneck, the sender waits four times longer before acting on
+evidence this weak.
+
+Recalibration must not leave the sender above its fair share. Reducing the
+window the probe reached by beta_recalibration provides that; see
+{{recalibration-fairness}}. Within that bound the sender may legitimately come
+out with more than it had, recovering bandwidth on a path where non-congestive
+loss has held the window below the available capacity.
+
 full_rtt is retaken when the recovery that ends that slow start exits, as
 described in {{full-rtt}}.
 
 
 # Properties
 
-## What Acceleration Can Take {#fairness}
+## Fairness of Acceleration {#fairness}
 
 Whether acceleration engages at all turns on the bottom and the top of the
 bottleneck queue being distinguishable.
@@ -440,10 +483,38 @@ the floor as `smoothed - k * variance`, the condition for a sample to lower the
 floor is exactly that the sample is below the floor when `a = b * (1 - k)`. The
 weights are therefore part of this property rather than free parameters.
 
-Recalibration cannot arm while the bottleneck is in use at all. A competing flow
-refilling the queue on its own congestion-avoidance trajectory produces a
-high-queue observation well inside twice expected_high_queue_interval, and each
-such observation restarts the interval.
+## Fairness of Recalibration {#recalibration-fairness}
+
+Recalibration is used where the bottleneck appears to be going unused, or where
+the queue cannot be observed well enough to tell ({{recalibrate}}). In the
+second case the bottleneck may in fact be in use.
+
+The queue may be shallow, though such queues are seldom deployed, serving
+loss-based congestion control poorly ({{Section 5.2.2 of ?ARCH=RFC3439}}).
+Non-congestive loss may have been frequent enough that the sender never saw the
+queue build up, leaving the path underutilized, where raising the congestion
+window is the outcome wanted. Or competing flows may be taking their losses
+asynchronously, so that the bottleneck stays busy and the queue never drains.
+The minima behind bottom_rtt then sit close to full_rtt, and the two ends cease
+to be distinguishable. It is this last case that the rest of this section
+concerns.
+
+Two things limit what recalibration costs a competing flow. Where the queue
+cannot be observed, its frequency is cut to a quarter, one probe per eight
+expected intervals rather than two. At every probe, whether the queue was
+observable or not, the window is reduced by beta_recalibration rather than as an
+ordinary exit from slow start.
+
+Once the flows have converged, each holds path_bdp / num_flows. Under the
+asynchronous loss model one competing flow yields at a time, and what it yields
+is (1 - beta_cubic) of a share. A reduction is the only event that frees
+capacity; between reductions every flow is increasing and reclaiming it, so no
+more than one yield is ever outstanding. That single yield is the most the probe
+can take beyond the sender's own share: the path admits at most (2 - beta_cubic)
+shares, whatever the number of flows. Slow start doubles each round trip, so the
+window at the congestion event ending the probe is up to twice what the path
+admitted. beta_recalibration is therefore the reciprocal of twice
+(2 - beta_cubic), so the sender comes away with no more than a single share.
 
 ## Yielding under Sustained Congestion {#yield}
 
