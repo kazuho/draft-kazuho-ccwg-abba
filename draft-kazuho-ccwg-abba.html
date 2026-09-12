@@ -1052,7 +1052,7 @@ svg {
 </tr></thead>
 <tfoot><tr>
 <td class="left">Oku</td>
-<td class="center">Expires 11 March 2027</td>
+<td class="center">Expires 16 March 2027</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1065,12 +1065,12 @@ svg {
 <dd class="internet-draft">draft-kazuho-ccwg-abba-latest</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-09-07" class="published">7 September 2026</time>
+<time datetime="2026-09-12" class="published">12 September 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Standards Track</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2027-03-11">11 March 2027</time></dd>
+<dd class="expires"><time datetime="2027-03-16">16 March 2027</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
@@ -1123,7 +1123,7 @@ loss and every ECN-CE mark produces the reduction that CUBIC specifies.<a href="
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 11 March 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 16 March 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1190,10 +1190,13 @@ loss and every ECN-CE mark produces the reduction that CUBIC specifies.<a href="
             <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-properties" class="internal xref">Properties</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.1">
-                <p id="section-toc.1-1.7.2.1.1"><a href="#section-7.1" class="auto internal xref">7.1</a>.  <a href="#name-what-acceleration-can-take" class="internal xref">What Acceleration Can Take</a></p>
+                <p id="section-toc.1-1.7.2.1.1"><a href="#section-7.1" class="auto internal xref">7.1</a>.  <a href="#name-fairness-of-acceleration" class="internal xref">Fairness of Acceleration</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.2">
-                <p id="section-toc.1-1.7.2.2.1"><a href="#section-7.2" class="auto internal xref">7.2</a>.  <a href="#name-yielding-under-sustained-co" class="internal xref">Yielding under Sustained Congestion</a></p>
+                <p id="section-toc.1-1.7.2.2.1"><a href="#section-7.2" class="auto internal xref">7.2</a>.  <a href="#name-fairness-of-recalibration" class="internal xref">Fairness of Recalibration</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.3">
+                <p id="section-toc.1-1.7.2.3.1"><a href="#section-7.3" class="auto internal xref">7.3</a>.  <a href="#name-yielding-under-sustained-co" class="internal xref">Yielding under Sustained Congestion</a></p>
 </li>
             </ul>
 </li>
@@ -1392,6 +1395,12 @@ not included.<a href="#section-4-2.6.1" class="pilcrow">¶</a></p>
           <p id="section-4-2.8.1">The time at which the bottleneck queue was most recently observed to be
 substantially occupied.<a href="#section-4-2.8.1" class="pilcrow">¶</a></p>
 </dd>
+        <dd class="break"></dd>
+<dt id="section-4-2.9">bytes_accelerated:</dt>
+        <dd style="margin-left: 1.5em" id="section-4-2.10">
+          <p id="section-4-2.10.1">The part of the congestion window's growth since the most recent congestion
+event that accelerated increase contributed.<a href="#section-4-2.10.1" class="pilcrow">¶</a></p>
+</dd>
       <dd class="break"></dd>
 </dl>
 <p id="section-4-3">The sender also uses min_rtt, the lowest round-trip time observed over the
@@ -1442,7 +1451,10 @@ abba_cwnd(cwnd, cwnd_cubic):
       and full_rtt &gt; bottom_rtt() + 10ms
       and full_rtt &gt; latest_rtt * 1.05
       and latest_rtt &lt; drain_threshold():
-    return max(cwnd_cubic, cwnd + segments_acked * ratio())
+    accelerated = cwnd + segments_acked * ratio()
+    if accelerated &gt; cwnd_cubic:
+      bytes_accelerated += accelerated - cwnd
+      return accelerated
   return cwnd_cubic
 
 drain_threshold():
@@ -1472,7 +1484,7 @@ feedback arrives one round late, so on a path whose round-trip time is below
 built.<a href="#section-5-6" class="pilcrow">¶</a></p>
 <p id="section-5-7">The upper bound holds one round-trip of acceleration to half of what would be
 needed to reverse a reduction, so that a sender under sustained congestion
-yields; see <a href="#yield" class="auto internal xref">Section 7.2</a>. A sender that reduces by a different factor when the
+yields; see <a href="#yield" class="auto internal xref">Section 7.3</a>. A sender that reduces by a different factor when the
 signal is an ECN-CE mark uses that factor after such a mark.<a href="#section-5-7" class="pilcrow">¶</a></p>
 </section>
 </div>
@@ -1554,51 +1566,84 @@ acceleration (<a href="#fairness" class="auto internal xref">Section 7.1</a>).<a
         <h3 id="name-recalibration">
 <a href="#section-6.3" class="section-number selfRef">6.3. </a><a href="#name-recalibration" class="section-name selfRef">Recalibration</a>
         </h3>
-<p id="section-6.3-1">full_rtt describes the path as it was when the observation was taken. If the
-queue does not return for long enough, either nothing on the path, including the
-sender itself, has been able to fill the available bandwidth, or the
-characteristics of the path have changed. In both cases the observation is
-retaken: the sender returns to slow start, with no slow start threshold and its
-congestion window unchanged. W_max is cleared, to prevent the sender from
-entering fast convergence once that slow start concludes
-(<span><a href="https://rfc-editor.org/rfc/rfc9438#section-4.7" class="relref">Section 4.7</a> of [<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>).<a href="#section-6.3-1" class="pilcrow">¶</a></p>
-<div class="alignLeft art-text artwork" id="section-6.3-2">
+<p id="section-6.3-1">Acceleration needs both ends of the bottleneck queue to be visible
+(<a href="#increase" class="auto internal xref">Section 5</a>). The top — full_rtt — is an observation, so it holds only for the
+path as it stood when it was taken. It can be wrong in three ways: nothing on
+the path, the sender included, has been filling the available bandwidth; the
+path has changed; or the slow start that produced it ended before the queue
+filled. The sender retakes it when no high-queue observation has been made for
+long enough.<a href="#section-6.3-1" class="pilcrow">¶</a></p>
+<p id="section-6.3-2">The sender returns to slow start with no slow start threshold, retaining its
+congestion window so that it probes upward from the rate it currently holds.
+W_max is cleared, to prevent the sender from entering fast convergence once that
+slow start concludes (<span><a href="https://rfc-editor.org/rfc/rfc9438#section-4.7" class="relref">Section 4.7</a> of [<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>).<a href="#section-6.3-2" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-6.3-3">
 <pre>
 on an rtt sample:
   if in congestion avoidance and congestion-window limited:
     if smoothed_rtt &gt;= bottom_rtt() + 10ms:
       last_high_queue_at = now
-    else if now - last_high_queue_at &gt;= 2 * expected_high_queue_interval():
+    else if now - last_high_queue_at &gt;= recalibration_interval():
       recalibrate()
 
 on an ECN-CE mark:               # including one received during recovery
   last_high_queue_at = now
 
+on a congestion event:
+  bytes_accelerated = 0
+  if in the slow start begun by recalibrate():
+    cwnd  = cwnd * beta_recalibration  # a different beta for the reduction
+    W_max = cwnd
+
+beta_recalibration = 1 / (2 * (2 - beta_cubic))
+
 recalibrate():
   W_max    = unset
   ssthresh = infinity            # cwnd is retained
+
+recalibration_interval():
+  if full_rtt &gt; bottom_rtt() + 10ms:
+    if bytes_accelerated &lt; cwnd * (1 - beta_cubic) / 4:
+      return infinity
+    return 2 * expected_high_queue_interval()
+  return 8 * expected_high_queue_interval()
 
 expected_high_queue_interval():
   K    = cbrt((cwnd_epoch / beta_cubic - cwnd_epoch) / C)
   reno = C * K^3 / alpha_cubic * full_rtt
   return min(K, reno) * cbrt(full_rtt / bottom_rtt())
-</pre><a href="#section-6.3-2" class="pilcrow">¶</a>
+</pre><a href="#section-6.3-3" class="pilcrow">¶</a>
 </div>
-<p id="section-6.3-3">expected_high_queue_interval is the time a flow on the current
+<p id="section-6.3-4">expected_high_queue_interval is the time a flow on the current
 congestion-avoidance trajectory would take to refill the queue. Both a CUBIC and
 a Reno-friendly flow are considered because a sender follows the greater of the
-two curves, and the shorter of the two return times is used.<a href="#section-6.3-3" class="pilcrow">¶</a></p>
-<p id="section-6.3-4">Only ECN-CE marks count as observations here, not losses. A mark is unambiguous
+two curves, and the shorter of the two return times is used.<a href="#section-6.3-4" class="pilcrow">¶</a></p>
+<p id="section-6.3-5">Only ECN-CE marks count as observations here, not losses. A mark is unambiguous
 evidence that the queue was deep, whereas a loss may be non-congestive; were
 losses to refresh the timestamp, frequent random loss on a drained path would
 restart the interval indefinitely and recalibration could never arm on the paths
-it exists for.<a href="#section-6.3-4" class="pilcrow">¶</a></p>
-<p id="section-6.3-5">Twice the interval is used so that a competing flow refilling the queue on its
-own trajectory refreshes the observation well within the window. Recalibration
-therefore does not occur while any flow is making use of the bottleneck.<a href="#section-6.3-5" class="pilcrow">¶</a></p>
-<p id="section-6.3-6">Retaining the congestion window leaves the sender probing from its current rate.
-full_rtt is retaken when the recovery that ends that slow start exits, as
-described in <a href="#full-rtt" class="auto internal xref">Section 6.1</a>.<a href="#section-6.3-6" class="pilcrow">¶</a></p>
+it exists for.<a href="#section-6.3-5" class="pilcrow">¶</a></p>
+<p id="section-6.3-6">Where full_rtt clears the high-queue threshold, accelerated increase can engage,
+and the sender requires it to have recovered a quarter of the last reduction
+before recalibrating. It engages only while the round-trip time is at the bottom
+of the queue (<a href="#increase" class="auto internal xref">Section 5</a>), so a period in which it materially gained is what
+indicates the bottleneck may be underutilized. The wait is two expected
+intervals, long enough for a competing flow refilling the queue on its own
+congestion-avoidance trajectory to refresh the observation.<a href="#section-6.3-6" class="pilcrow">¶</a></p>
+<p id="section-6.3-7">Where full_rtt does not clear that threshold, neither condition holds up:
+acceleration never engages, so the gain is unavailable, and the absence of a
+high-queue observation no longer separates an unused bottleneck from one whose
+queue never reaches the threshold. Recalibration rests on the interval alone.
+Since the probe overflows the queue, imposing a congestion event on any other
+flow using the bottleneck, the sender waits four times longer before acting on
+evidence this weak.<a href="#section-6.3-7" class="pilcrow">¶</a></p>
+<p id="section-6.3-8">Recalibration must not leave the sender above its fair share. Reducing the
+window the probe reached by beta_recalibration provides that; see
+<a href="#recalibration-fairness" class="auto internal xref">Section 7.2</a>. Within that bound the sender may legitimately come
+out with more than it had, recovering bandwidth on a path where non-congestive
+loss has held the window below the available capacity.<a href="#section-6.3-8" class="pilcrow">¶</a></p>
+<p id="section-6.3-9">full_rtt is retaken when the recovery that ends that slow start exits, as
+described in <a href="#full-rtt" class="auto internal xref">Section 6.1</a>.<a href="#section-6.3-9" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -1610,8 +1655,8 @@ described in <a href="#full-rtt" class="auto internal xref">Section 6.1</a>.<a h
       </h2>
 <div id="fairness">
 <section id="section-7.1">
-        <h3 id="name-what-acceleration-can-take">
-<a href="#section-7.1" class="section-number selfRef">7.1. </a><a href="#name-what-acceleration-can-take" class="section-name selfRef">What Acceleration Can Take</a>
+        <h3 id="name-fairness-of-acceleration">
+<a href="#section-7.1" class="section-number selfRef">7.1. </a><a href="#name-fairness-of-acceleration" class="section-name selfRef">Fairness of Acceleration</a>
         </h3>
 <p id="section-7.1-1">Whether acceleration engages at all turns on the bottom and the top of the
 bottleneck queue being distinguishable.<a href="#section-7.1-1" class="pilcrow">¶</a></p>
@@ -1657,24 +1702,54 @@ estimate lowers it. The three are related: writing the weights as <code>a</code>
 the floor as <code>smoothed - k * variance</code>, the condition for a sample to lower the
 floor is exactly that the sample is below the floor when <code>a = b * (1 - k)</code>. The
 weights are therefore part of this property rather than free parameters.<a href="#section-7.1-5" class="pilcrow">¶</a></p>
-<p id="section-7.1-6">Recalibration cannot arm while the bottleneck is in use at all. A competing flow
-refilling the queue on its own congestion-avoidance trajectory produces a
-high-queue observation well inside twice expected_high_queue_interval, and each
-such observation restarts the interval.<a href="#section-7.1-6" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="recalibration-fairness">
+<section id="section-7.2">
+        <h3 id="name-fairness-of-recalibration">
+<a href="#section-7.2" class="section-number selfRef">7.2. </a><a href="#name-fairness-of-recalibration" class="section-name selfRef">Fairness of Recalibration</a>
+        </h3>
+<p id="section-7.2-1">Recalibration is used where the bottleneck appears to be going unused, or where
+the queue cannot be observed well enough to tell (<a href="#recalibrate" class="auto internal xref">Section 6.3</a>). In the
+second case the bottleneck may in fact be in use.<a href="#section-7.2-1" class="pilcrow">¶</a></p>
+<p id="section-7.2-2">The queue may be shallow, though such queues are seldom deployed, serving
+loss-based congestion control poorly (<span><a href="https://rfc-editor.org/rfc/rfc3439#section-5.2.2" class="relref">Section 5.2.2</a> of [<a href="#ARCH" class="cite xref">ARCH</a>]</span>).
+Non-congestive loss may have been frequent enough that the sender never saw the
+queue build up, leaving the path underutilized, where raising the congestion
+window is the outcome wanted. Or competing flows may be taking their losses
+asynchronously, so that the bottleneck stays busy and the queue never drains.
+The minima behind bottom_rtt then sit close to full_rtt, and the two ends cease
+to be distinguishable. It is this last case that the rest of this section
+concerns.<a href="#section-7.2-2" class="pilcrow">¶</a></p>
+<p id="section-7.2-3">Two things limit what recalibration costs a competing flow. Where the queue
+cannot be observed, its frequency is cut to a quarter, one probe per eight
+expected intervals rather than two. At every probe, whether the queue was
+observable or not, the window is reduced by beta_recalibration rather than as an
+ordinary exit from slow start.<a href="#section-7.2-3" class="pilcrow">¶</a></p>
+<p id="section-7.2-4">Once the flows have converged, each holds path_bdp / num_flows. Under the
+asynchronous loss model one competing flow yields at a time, and what it yields
+is (1 - beta_cubic) of a share. A reduction is the only event that frees
+capacity; between reductions every flow is increasing and reclaiming it, so no
+more than one yield is ever outstanding. That single yield is the most the probe
+can take beyond the sender's own share: the path admits at most (2 - beta_cubic)
+shares, whatever the number of flows. Slow start doubles each round trip, so the
+window at the congestion event ending the probe is up to twice what the path
+admitted. beta_recalibration is therefore the reciprocal of twice
+(2 - beta_cubic), so the sender comes away with no more than a single share.<a href="#section-7.2-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="yield">
-<section id="section-7.2">
+<section id="section-7.3">
         <h3 id="name-yielding-under-sustained-co">
-<a href="#section-7.2" class="section-number selfRef">7.2. </a><a href="#name-yielding-under-sustained-co" class="section-name selfRef">Yielding under Sustained Congestion</a>
+<a href="#section-7.3" class="section-number selfRef">7.3. </a><a href="#name-yielding-under-sustained-co" class="section-name selfRef">Yielding under Sustained Congestion</a>
         </h3>
-<p id="section-7.2-1">ABBA modifies the increase of the congestion window only. Every lost packet and
+<p id="section-7.3-1">ABBA modifies the increase of the congestion window only. Every lost packet and
 every ECN-CE mark produces the reduction the underlying controller specifies, and
-no congestion signal is suppressed, deferred, or scaled.<a href="#section-7.2-1" class="pilcrow">¶</a></p>
-<p id="section-7.2-2">Because ratio is capped at half of what would reverse a reduction over one
+no congestion signal is suppressed, deferred, or scaled.<a href="#section-7.3-1" class="pilcrow">¶</a></p>
+<p id="section-7.3-2">Because ratio is capped at half of what would reverse a reduction over one
 round-trip, a sender cannot recover a reduction before a further congestion
 signal can arrive. A sender whose round-trip time signal is misleading therefore
-increases too quickly for a round-trip or two and then yields.<a href="#section-7.2-2" class="pilcrow">¶</a></p>
+increases too quickly for a round-trip or two and then yields.<a href="#section-7.3-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -1727,6 +1802,10 @@ increases too quickly for a round-trip or two and then yields.<a href="#section-
 <a href="#section-10.2" class="section-number selfRef">10.2. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
         </h3>
 <dl class="references">
+<dt id="ARCH">[ARCH]</dt>
+        <dd>
+<span class="refAuthor">Bush, R.</span> and <span class="refAuthor">D. Meyer</span>, <span class="refTitle">"Some Internet Architectural Guidelines and Philosophy"</span>, <span class="seriesInfo">RFC 3439</span>, <span class="seriesInfo">DOI 10.17487/RFC3439</span>, <time datetime="2002-12" class="refDate">December 2002</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3439">https://www.rfc-editor.org/rfc/rfc3439</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="CUBACK">[CUBACK]</dt>
         <dd>
 <span class="refAuthor">Oku, K.</span>, <span class="refTitle">"CUBACK: CUBIC Driven by the ACK Clock"</span>, <span>n.d.</span>, <span>&lt;<a href="https://github.com/kazuho/draft-kazuho-ccwg-cuback">https://github.com/kazuho/draft-kazuho-ccwg-cuback</a>&gt;</span>. </dd>
