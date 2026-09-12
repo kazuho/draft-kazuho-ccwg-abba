@@ -37,8 +37,9 @@ non-congestive loss. When round-trip-time observations indicate a drained
 bottleneck queue and sufficient headroom, ABBA permits window growth faster than
 CUBIC would, adding a controlled amount of queueing. If the path appears
 underutilized for too long, ABBA returns to slow start to refresh its
-observations and restore utilization. ABBA modifies window increase only: every
-loss and every ECN-CE mark produces the reduction that CUBIC specifies.
+observations and restore utilization. No congestion signal is suppressed: every
+loss and every ECN-CE mark produces the reduction CUBIC specifies, or a steeper
+one.
 
 --- middle
 
@@ -80,11 +81,11 @@ accelerating the increase of the congestion window while the bottleneck queue is
 observed to be drained, and by recalibrating its queue observations when the
 queue fails to return for long enough.
 
-ABBA modifies window increase only. It does not suppress, defer, or scale any
-congestion response: every lost packet and every ECN-CE mark {{?ECN=RFC3168}}
-produces the reduction that CUBIC specifies. The accelerated increase is in turn
-bounded below that reduction, so under sustained congestion the sender always
-yields, however the round-trip time signal may be misread.
+ABBA does not suppress or defer any congestion response: every lost packet and
+every ECN-CE mark {{?ECN=RFC3168}} produces the reduction CUBIC specifies, or a
+steeper one. The accelerated increase is in turn bounded below that reduction,
+so under sustained congestion the sender always yields, however the round-trip
+time signal may be misread.
 
 The following subsection sets out the objective ABBA is aimed at: the delivery
 time of an object.
@@ -519,9 +520,10 @@ admitted. beta_recalibration is therefore the reciprocal of twice
 
 ## Yielding under Sustained Congestion {#yield}
 
-ABBA modifies the increase of the congestion window only. Every lost packet and
-every ECN-CE mark produces the reduction the underlying controller specifies, and
-no congestion signal is suppressed, deferred, or scaled.
+No congestion signal is suppressed or deferred. Every lost packet and every
+ECN-CE mark produces the reduction the underlying controller specifies, except
+at the congestion event that ends a recalibration probe, where
+beta_recalibration reduces the window further still.
 
 Because ratio is capped at half of what would reverse a reduction over one
 round-trip, a sender cannot recover a reduction before a further congestion
