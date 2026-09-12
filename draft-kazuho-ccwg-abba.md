@@ -447,10 +447,11 @@ Whether acceleration engages at all turns on the bottom and the top of the
 bottleneck queue being distinguishable.
 
 Where they are not — full_rtt within 10ms of bottom_rtt — the conditions in
-{{increase}} never hold and the sender behaves as CUBIC throughout. That is the
-case in which the delay signal could not separate a drained queue from an
-occupied one, and it is also the case, a shallow bottleneck buffer, in which
-acting on a misreading would cost a competing flow most.
+{{increase}} never hold, and the sender's congestion-avoidance window growth is
+CUBIC's throughout. That is the case in which the delay signal could not
+separate a drained queue from an occupied one, and it is also the case in which
+acting on a misreading could cost competing flows, since the bottleneck may be
+busy while appearing stable ({{recalibration-fairness}}).
 
 Where they are distinguishable, acceleration can engage even while a competing
 flow occupies the bottleneck, since past_periods_min follows the minima that flow
