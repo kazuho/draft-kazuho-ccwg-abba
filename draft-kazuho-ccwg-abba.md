@@ -412,12 +412,13 @@ restart the interval indefinitely and recalibration could never arm on the paths
 it exists for.
 
 Where full_rtt clears the high-queue threshold, accelerated increase can engage,
-and the sender requires it to have recovered a quarter of the last reduction
-before recalibrating. It engages only while the round-trip time is at the bottom
-of the queue ({{increase}}), so a period in which it materially gained is what
-indicates the bottleneck may be underutilized. The wait is two expected
-intervals, long enough for a competing flow refilling the queue on its own
-congestion-avoidance trajectory to refresh the observation.
+and recalibration is useful only once that increase indicates the bottleneck may
+be underutilized. Accelerated increase engages only while the round-trip time is
+at the bottom of the queue ({{increase}}), so a period in which it has gained
+materially is what supplies that indication. The high-queue observation must
+additionally have been absent for two expected intervals, long enough for a
+competing flow refilling the queue on its own congestion-avoidance trajectory to
+refresh it.
 
 Where full_rtt does not clear that threshold, neither condition holds up:
 acceleration never engages, so the gain is unavailable, and the absence of a
