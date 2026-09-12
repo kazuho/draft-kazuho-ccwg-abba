@@ -13,8 +13,9 @@ non-congestive loss. When round-trip-time observations indicate a drained
 bottleneck queue and sufficient headroom, ABBA permits window growth faster than
 CUBIC would, adding a controlled amount of queueing. If the path appears
 underutilized for too long, ABBA returns to slow start to refresh its
-observations and restore utilization. ABBA modifies window increase only: every
-loss and every ECN-CE mark produces the reduction that CUBIC specifies. 
+observations and restore utilization. No congestion signal is suppressed: every
+loss and every ECN-CE mark produces the reduction CUBIC specifies, or a steeper
+one. 
     " name="description">
 <meta content="xml2rfc 3.34.0" name="generator">
 <meta content="internet-draft" name="keyword">
@@ -1090,8 +1091,9 @@ non-congestive loss. When round-trip-time observations indicate a drained
 bottleneck queue and sufficient headroom, ABBA permits window growth faster than
 CUBIC would, adding a controlled amount of queueing. If the path appears
 underutilized for too long, ABBA returns to slow start to refresh its
-observations and restore utilization. ABBA modifies window increase only: every
-loss and every ECN-CE mark produces the reduction that CUBIC specifies.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+observations and restore utilization. No congestion signal is suppressed: every
+loss and every ECN-CE mark produces the reduction CUBIC specifies, or a steeper
+one.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
 <section class="note rfcEditorRemove" id="section-note.1">
       <h2 id="name-discussion-venues">
@@ -1269,11 +1271,11 @@ increases faster than that, the sender does not fully utilize it.<a href="#secti
 accelerating the increase of the congestion window while the bottleneck queue is
 observed to be drained, and by recalibrating its queue observations when the
 queue fails to return for long enough.<a href="#section-1-5" class="pilcrow">¶</a></p>
-<p id="section-1-6">ABBA modifies window increase only. It does not suppress, defer, or scale any
-congestion response: every lost packet and every ECN-CE mark <span>[<a href="#ECN" class="cite xref">ECN</a>]</span>
-produces the reduction that CUBIC specifies. The accelerated increase is in turn
-bounded below that reduction, so under sustained congestion the sender always
-yields, however the round-trip time signal may be misread.<a href="#section-1-6" class="pilcrow">¶</a></p>
+<p id="section-1-6">ABBA does not suppress or defer any congestion response: every lost packet and
+every ECN-CE mark <span>[<a href="#ECN" class="cite xref">ECN</a>]</span> produces the reduction CUBIC specifies, or a
+steeper one. The accelerated increase is in turn bounded below that reduction,
+so under sustained congestion the sender always yields, however the round-trip
+time signal may be misread.<a href="#section-1-6" class="pilcrow">¶</a></p>
 <p id="section-1-7">The following subsection sets out the objective ABBA is aimed at: the delivery
 time of an object.<a href="#section-1-7" class="pilcrow">¶</a></p>
 <div id="object-delivery">
@@ -1744,9 +1746,10 @@ admitted. beta_recalibration is therefore the reciprocal of twice
         <h3 id="name-yielding-under-sustained-co">
 <a href="#section-7.3" class="section-number selfRef">7.3. </a><a href="#name-yielding-under-sustained-co" class="section-name selfRef">Yielding under Sustained Congestion</a>
         </h3>
-<p id="section-7.3-1">ABBA modifies the increase of the congestion window only. Every lost packet and
-every ECN-CE mark produces the reduction the underlying controller specifies, and
-no congestion signal is suppressed, deferred, or scaled.<a href="#section-7.3-1" class="pilcrow">¶</a></p>
+<p id="section-7.3-1">No congestion signal is suppressed or deferred. Every lost packet and every
+ECN-CE mark produces the reduction the underlying controller specifies, except
+at the congestion event that ends a recalibration probe, where
+beta_recalibration reduces the window further still.<a href="#section-7.3-1" class="pilcrow">¶</a></p>
 <p id="section-7.3-2">Because ratio is capped at half of what would reverse a reduction over one
 round-trip, a sender cannot recover a reduction before a further congestion
 signal can arrive. A sender whose round-trip time signal is misleading therefore
