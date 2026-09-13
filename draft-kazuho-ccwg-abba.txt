@@ -4,8 +4,8 @@
 
 Congestion Control Working Group                        奥 一穂 (K. Oku)
 Internet-Draft                                                    Fastly
-Intended status: Standards Track                       12 September 2026
-Expires: 16 March 2027
+Intended status: Standards Track                       13 September 2026
+Expires: 17 March 2027
 
 
            Accelerated Bottleneck Bandwidth Adaptation (ABBA)
@@ -50,7 +50,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 16 March 2027.
+   This Internet-Draft will expire on 17 March 2027.
 
 Copyright Notice
 
@@ -70,6 +70,7 @@ Table of Contents
 
    1.  Introduction
      1.1.  Optimizing for Object Delivery
+     1.2.  Relationship to Low-Latency Mechanisms
    2.  Conventions and Definitions
    3.  Overview
    4.  Sender State
@@ -82,6 +83,7 @@ Table of Contents
      7.1.  Fairness of Acceleration
      7.2.  Fairness of Recalibration
      7.3.  Yielding under Sustained Congestion
+     7.4.  Behavior at a Managed Bottleneck
    8.  Security Considerations
    9.  IANA Considerations
    10. References
@@ -139,8 +141,9 @@ Table of Contents
    sender always yields, however the round-trip time signal may be
    misread.
 
-   The following subsection sets out the objective ABBA is aimed at: the
-   delivery time of an object.
+   The following subsections set out the objective ABBA is aimed at —
+   the delivery time of an object — and how it relates to mechanisms
+   that pursue low queueing delay.
 
 1.1.  Optimizing for Object Delivery
 
@@ -196,6 +199,29 @@ Table of Contents
    three specifications is object delivery, and therefore they accept
    queueing in pursuit of earlier delivery rather than treating the
    lowest round-trip time as the objective.
+
+1.2.  Relationship to Low-Latency Mechanisms
+
+   Loss-based congestion control and a focus on object delivery do not
+   preclude low queueing delay; they place the responsibility for it in
+   the network.  Active queue management limits persistent queueing
+   [AQM], and flow isolation confines the delay queue-building flow
+   imposes to that flow, as in FQ-CoDel [FQ-CODEL].  These mechanisms
+   act on queueing in the network, independently of how quickly a sender
+   acquires the bandwidth available to it.  ABBA addresses the latter,
+   when the congestion window is insufficient to use the available
+   bandwidth.  Section 7.4 analyses how it behaves where such a
+   bottleneck is deployed.
+
+   L4S [L4S] combines network support with scalable congestion control
+   to achieve low queueing delay and high utilization.  Prague can be
+   implemented as a modification to CUBIC, changing the response to loss
+   and the growth that follows (Section 2.4.1 of [PRAGUE]).  It is
+   possible to implement ABBA as a supplement of such a congestion
+   control, with ABBA overriding the increase rate while the congestion
+   signals are invisible.  This combination addresses Prague's concern
+   about slow adaptation following an increase in available capacity
+   Section 3.1.2 of [PRAGUE].
 
 2.  Conventions and Definitions
 
@@ -603,6 +629,62 @@ expected_high_queue_interval():
    signal is misleading therefore increases too quickly for a round-trip
    or two and then yields.
 
+7.4.  Behavior at a Managed Bottleneck
+
+   An actively managed bottleneck typically combines three things:
+   isolation between flows, congestion signalled from a shallow queue
+   using ECN, and a buffer far deeper than that queue.  Isolation
+   distributes bandwidth among flows irrespective of how aggressively
+   each sends, and confines the delay a queue-building flow creates to
+   that flow.  Aggressive signalling of congestion keeps the delay
+   small, while the depth of the buffer and the use of ECN-CE minimize
+   the packet drops that would cost the endpoints recovery delay.
+
+   FQ-CoDel [FQ-CODEL] is the common instance.  It hashes flows into
+   separate queues and signals congestion using ECN once the queue has
+   stood above 5ms for 100ms (the defaults defined in Section 5.3 of
+   [CODEL]).  The buffer behind is sized for the link, 10240 packets by
+   default, a limit the algorithm's own congestion signalling keep it
+   from reaching.
+
+   ABBA observes the top of such a bottleneck queue the same way it does
+   on an unmanaged path.  Slow start doubles the rate each round trip,
+   and the control law does not act until the delay has stood above its
+   target for an interval, so the queue full_rtt records is the one the
+   overshoot built and not the one the target names.  The two ends of
+   the queue remain distinguishable and the conditions of Section 5 can
+   hold.  A bottleneck configured to mark as soon as a shallow queue
+   forms does not yield a shallow observation either: the sender doubles
+   its rate over the round trip the signal takes to arrive, so full_rtt
+   again comes out at about twice the idle round-trip time, as it does
+   for a conservative slow start (Section 6.1).
+
+   Marking disarms recalibration.  A CE mark is a congestion event,
+   reduced as [CUBIC] specifies, and it refreshes last_high_queue_at
+   (Section 6.3).  A sender whose queue is being signalled therefore
+   does not return to slow start, however shallow the standing queue the
+   bottleneck permits.
+
+   The accelerated increase remains, and it engages while the round-trip
+   time is within 2ms of the observed floor, minimizing moments within
+   which the queue is fully drained and therefore the bottleneck path is
+   underutilized.  When the latency of the path is below 100ms, increase
+   of the queue depth concludes before reaching 4.5ms, slightly below
+   the default 5ms threshold used by FQ-CoDel.  From there on, CUBIC
+   controls the growth.
+
+   Therefore, against such a path, an ABBA sender behaves as CUBIC does,
+   while quickly fixing underutilization, including that caused
+   separately by packet losses.  Where the accelerated increase does
+   carry the window past the marking threshold, on a longer path or
+   after an overshoot, the bottleneck marks sooner and the congestion
+   avoidance period is correspondingly shorter.  Congestion being
+   signalled by ECN-CE, that only costs a reduction of the window, which
+   is quickly fixed by the accelerated increase.  The shorter period
+   does not reach other flows: isolation confines the queue to the flow
+   that built it, and apportions bandwidth irrespective of how
+   aggressively each sends.
+
 8.  Security Considerations
 
    TODO Security
@@ -631,10 +713,20 @@ expected_high_queue_interval():
 
 10.2.  Informative References
 
+   [AQM]      Baker, F., Ed. and G. Fairhurst, Ed., "IETF
+              Recommendations Regarding Active Queue Management",
+              BCP 197, RFC 7567, DOI 10.17487/RFC7567, July 2015,
+              <https://www.rfc-editor.org/rfc/rfc7567>.
+
    [ARCH]     Bush, R. and D. Meyer, "Some Internet Architectural
               Guidelines and Philosophy", RFC 3439,
               DOI 10.17487/RFC3439, December 2002,
               <https://www.rfc-editor.org/rfc/rfc3439>.
+
+   [CODEL]    Nichols, K., Jacobson, V., McGregor, A., Ed., and J.
+              Iyengar, Ed., "Controlled Delay Active Queue Management",
+              RFC 8289, DOI 10.17487/RFC8289, January 2018,
+              <https://www.rfc-editor.org/rfc/rfc8289>.
 
    [CUBACK]   Oku, K., "CUBACK: CUBIC Driven by the ACK Clock", n.d.,
               <https://github.com/kazuho/draft-kazuho-ccwg-cuback>.
@@ -643,6 +735,12 @@ expected_high_queue_interval():
               of Explicit Congestion Notification (ECN) to IP",
               RFC 3168, DOI 10.17487/RFC3168, September 2001,
               <https://www.rfc-editor.org/rfc/rfc3168>.
+
+   [FQ-CODEL] Hoeiland-Joergensen, T., McKenney, P., Taht, D., Gettys,
+              J., and E. Dumazet, "The Flow Queue CoDel Packet Scheduler
+              and Active Queue Management Algorithm", RFC 8290,
+              DOI 10.17487/RFC8290, January 2018,
+              <https://www.rfc-editor.org/rfc/rfc8290>.
 
    [HYSTART]  Balasubramanian, P., Huang, Y., and M. Olson, "HyStart++:
               Modified Slow Start for TCP", RFC 9406,
@@ -654,6 +752,18 @@ expected_high_queue_interval():
               Progress, Internet-Draft, draft-kazuho-ccwg-rapid-start-
               02, 15 March 2026, <https://datatracker.ietf.org/doc/html/
               draft-kazuho-ccwg-rapid-start-02>.
+
+   [L4S]      Briscoe, B., Ed., De Schepper, K., Bagnulo, M., and G.
+              White, "Low Latency, Low Loss, and Scalable Throughput
+              (L4S) Internet Service: Architecture", RFC 9330,
+              DOI 10.17487/RFC9330, January 2023,
+              <https://www.rfc-editor.org/rfc/rfc9330>.
+
+   [PRAGUE]   De Schepper, K., Tilmans, O., Briscoe, B., and V. Goel,
+              "Prague Congestion Control", Work in Progress, Internet-
+              Draft, draft-briscoe-iccrg-prague-congestion-control-04,
+              24 July 2024, <https://datatracker.ietf.org/doc/html/
+              draft-briscoe-iccrg-prague-congestion-control-04>.
 
 Acknowledgments
 

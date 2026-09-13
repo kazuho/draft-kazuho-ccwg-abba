@@ -1053,7 +1053,7 @@ svg {
 </tr></thead>
 <tfoot><tr>
 <td class="left">Oku</td>
-<td class="center">Expires 16 March 2027</td>
+<td class="center">Expires 17 March 2027</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1066,12 +1066,12 @@ svg {
 <dd class="internet-draft">draft-kazuho-ccwg-abba-latest</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-09-12" class="published">12 September 2026</time>
+<time datetime="2026-09-13" class="published">13 September 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Standards Track</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2027-03-16">16 March 2027</time></dd>
+<dd class="expires"><time datetime="2027-03-17">17 March 2027</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
@@ -1125,7 +1125,7 @@ one.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 16 March 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 17 March 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1160,10 +1160,13 @@ one.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1.2.1">
                 <p id="section-toc.1-1.1.2.1.1" class="keepWithNext"><a href="#section-1.1" class="auto internal xref">1.1</a>.  <a href="#name-optimizing-for-object-deliv" class="internal xref">Optimizing for Object Delivery</a></p>
 </li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1.2.2">
+                <p id="section-toc.1-1.1.2.2.1" class="keepWithNext"><a href="#section-1.2" class="auto internal xref">1.2</a>.  <a href="#name-relationship-to-low-latency" class="internal xref">Relationship to Low-Latency Mechanisms</a></p>
+</li>
             </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
-            <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-conventions-and-definitions" class="internal xref">Conventions and Definitions</a></p>
+            <p id="section-toc.1-1.2.1"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-conventions-and-definitions" class="internal xref">Conventions and Definitions</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3">
             <p id="section-toc.1-1.3.1"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-overview" class="internal xref">Overview</a></p>
@@ -1199,6 +1202,9 @@ one.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.3">
                 <p id="section-toc.1-1.7.2.3.1"><a href="#section-7.3" class="auto internal xref">7.3</a>.  <a href="#name-yielding-under-sustained-co" class="internal xref">Yielding under Sustained Congestion</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.4">
+                <p id="section-toc.1-1.7.2.4.1"><a href="#section-7.4" class="auto internal xref">7.4</a>.  <a href="#name-behavior-at-a-managed-bottl" class="internal xref">Behavior at a Managed Bottleneck</a></p>
 </li>
             </ul>
 </li>
@@ -1276,8 +1282,9 @@ every ECN-CE mark <span>[<a href="#ECN" class="cite xref">ECN</a>]</span> produc
 steeper one. The accelerated increase is in turn bounded below that reduction,
 so under sustained congestion the sender always yields, however the round-trip
 time signal may be misread.<a href="#section-1-6" class="pilcrow">¶</a></p>
-<p id="section-1-7">The following subsection sets out the objective ABBA is aimed at: the delivery
-time of an object.<a href="#section-1-7" class="pilcrow">¶</a></p>
+<p id="section-1-7">The following subsections set out the objective ABBA is aimed at — the delivery
+time of an object — and how it relates to mechanisms that pursue low queueing
+delay.<a href="#section-1-7" class="pilcrow">¶</a></p>
 <div id="object-delivery">
 <section id="section-1.1">
         <h3 id="name-optimizing-for-object-deliv">
@@ -1324,6 +1331,30 @@ acquisition and consequently object delivery. The primary application of the
 three specifications is object delivery, and therefore they accept queueing in
 pursuit of earlier delivery rather than treating the lowest round-trip time as
 the objective.<a href="#section-1.1-6" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="low-latency">
+<section id="section-1.2">
+        <h3 id="name-relationship-to-low-latency">
+<a href="#section-1.2" class="section-number selfRef">1.2. </a><a href="#name-relationship-to-low-latency" class="section-name selfRef">Relationship to Low-Latency Mechanisms</a>
+        </h3>
+<p id="section-1.2-1">Loss-based congestion control and a focus on object delivery do not preclude low
+queueing delay; they place the responsibility for it in the network. Active
+queue management limits persistent queueing <span>[<a href="#AQM" class="cite xref">AQM</a>]</span>, and flow isolation
+confines the delay queue-building flow imposes to that flow, as in FQ-CoDel
+<span>[<a href="#FQ-CODEL" class="cite xref">FQ-CODEL</a>]</span>. These mechanisms act on queueing in the network,
+independently of how quickly a sender acquires the bandwidth available to it.
+ABBA addresses the latter, when the congestion window is insufficient to use the
+available bandwidth. <a href="#managed" class="auto internal xref">Section 7.4</a> analyses how it behaves where such a bottleneck
+is deployed.<a href="#section-1.2-1" class="pilcrow">¶</a></p>
+<p id="section-1.2-2">L4S <span>[<a href="#L4S" class="cite xref">L4S</a>]</span> combines network support with scalable congestion control to
+achieve low queueing delay and high utilization. Prague can be implemented as a
+modification to CUBIC, changing the response to loss and the growth that follows
+(<span><a href="https://datatracker.ietf.org/doc/html/draft-briscoe-iccrg-prague-congestion-control-04#section-2.4.1" class="relref">Section 2.4.1</a> of [<a href="#PRAGUE" class="cite xref">PRAGUE</a>]</span>). It
+is possible to implement ABBA as a supplement of such a congestion control, with
+ABBA overriding the increase rate while the congestion signals are invisible.
+This combination addresses Prague's concern about slow adaptation following an
+increase in available capacity <span><a href="https://datatracker.ietf.org/doc/html/draft-briscoe-iccrg-prague-congestion-control-04#section-3.1.2" class="relref">Section 3.1.2</a> of [<a href="#PRAGUE" class="cite xref">PRAGUE</a>]</span>.<a href="#section-1.2-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -1757,6 +1788,54 @@ signal can arrive. A sender whose round-trip time signal is misleading therefore
 increases too quickly for a round-trip or two and then yields.<a href="#section-7.3-2" class="pilcrow">¶</a></p>
 </section>
 </div>
+<div id="managed">
+<section id="section-7.4">
+        <h3 id="name-behavior-at-a-managed-bottl">
+<a href="#section-7.4" class="section-number selfRef">7.4. </a><a href="#name-behavior-at-a-managed-bottl" class="section-name selfRef">Behavior at a Managed Bottleneck</a>
+        </h3>
+<p id="section-7.4-1">An actively managed bottleneck typically combines three things: isolation
+between flows, congestion signalled from a shallow queue using ECN, and a buffer
+far deeper than that queue. Isolation distributes bandwidth among flows
+irrespective of how aggressively each sends, and confines the delay a
+queue-building flow creates to that flow. Aggressive signalling of congestion
+keeps the delay small, while the depth of the buffer and the use of ECN-CE
+minimize the packet drops that would cost the endpoints recovery delay.<a href="#section-7.4-1" class="pilcrow">¶</a></p>
+<p id="section-7.4-2">FQ-CoDel <span>[<a href="#FQ-CODEL" class="cite xref">FQ-CODEL</a>]</span> is the common instance. It hashes flows into separate
+queues and signals congestion using ECN once the queue has stood above 5ms for
+100ms (the defaults defined in <span><a href="https://rfc-editor.org/rfc/rfc8289#section-5.3" class="relref">Section 5.3</a> of [<a href="#CODEL" class="cite xref">CODEL</a>]</span>). The buffer
+behind is sized for the link, 10240 packets by default, a limit the algorithm's
+own congestion signalling keep it from reaching.<a href="#section-7.4-2" class="pilcrow">¶</a></p>
+<p id="section-7.4-3">ABBA observes the top of such a bottleneck queue the same way it does on an
+unmanaged path. Slow start doubles the rate each round trip, and the control law
+does not act until the delay has stood above its target for an interval, so the
+queue full_rtt records is the one the overshoot built and not the one the target
+names. The two ends of the queue remain distinguishable and the conditions of
+<a href="#increase" class="auto internal xref">Section 5</a> can hold. A bottleneck configured to mark as soon as a shallow
+queue forms does not yield a shallow observation either: the sender doubles its
+rate over the round trip the signal takes to arrive, so full_rtt again comes out
+at about twice the idle round-trip time, as it does for a conservative slow
+start (<a href="#full-rtt" class="auto internal xref">Section 6.1</a>).<a href="#section-7.4-3" class="pilcrow">¶</a></p>
+<p id="section-7.4-4">Marking disarms recalibration. A CE mark is a congestion event, reduced as
+<span>[<a href="#CUBIC" class="cite xref">CUBIC</a>]</span> specifies, and it refreshes last_high_queue_at (<a href="#recalibrate" class="auto internal xref">Section 6.3</a>). A
+sender whose queue is being signalled therefore does not return to slow start,
+however shallow the standing queue the bottleneck permits.<a href="#section-7.4-4" class="pilcrow">¶</a></p>
+<p id="section-7.4-5">The accelerated increase remains, and it engages while the round-trip time is
+within 2ms of the observed floor, minimizing moments within which the queue is
+fully drained and therefore the bottleneck path is underutilized. When the
+latency of the path is below 100ms, increase of the queue depth concludes before
+reaching 4.5ms, slightly below the default 5ms threshold used by FQ-CoDel. From
+there on, CUBIC controls the growth.<a href="#section-7.4-5" class="pilcrow">¶</a></p>
+<p id="section-7.4-6">Therefore, against such a path, an ABBA sender behaves as CUBIC does, while
+quickly fixing underutilization, including that caused separately by packet
+losses. Where the accelerated increase does carry the window past the marking
+threshold, on a longer path or after an overshoot, the bottleneck marks sooner
+and the congestion avoidance period is correspondingly shorter. Congestion being
+signalled by ECN-CE, that only costs a reduction of the window, which is quickly
+fixed by the accelerated increase. The shorter period does not reach other
+flows: isolation confines the queue to the flow that built it, and apportions
+bandwidth irrespective of how aggressively each sends.<a href="#section-7.4-6" class="pilcrow">¶</a></p>
+</section>
+</div>
 </section>
 </div>
 <div id="security">
@@ -1807,9 +1886,17 @@ increases too quickly for a round-trip or two and then yields.<a href="#section-
 <a href="#section-10.2" class="section-number selfRef">10.2. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
         </h3>
 <dl class="references">
+<dt id="AQM">[AQM]</dt>
+        <dd>
+<span class="refAuthor">Baker, F., Ed.</span> and <span class="refAuthor">G. Fairhurst, Ed.</span>, <span class="refTitle">"IETF Recommendations Regarding Active Queue Management"</span>, <span class="seriesInfo">BCP 197</span>, <span class="seriesInfo">RFC 7567</span>, <span class="seriesInfo">DOI 10.17487/RFC7567</span>, <time datetime="2015-07" class="refDate">July 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7567">https://www.rfc-editor.org/rfc/rfc7567</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="ARCH">[ARCH]</dt>
         <dd>
 <span class="refAuthor">Bush, R.</span> and <span class="refAuthor">D. Meyer</span>, <span class="refTitle">"Some Internet Architectural Guidelines and Philosophy"</span>, <span class="seriesInfo">RFC 3439</span>, <span class="seriesInfo">DOI 10.17487/RFC3439</span>, <time datetime="2002-12" class="refDate">December 2002</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3439">https://www.rfc-editor.org/rfc/rfc3439</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="CODEL">[CODEL]</dt>
+        <dd>
+<span class="refAuthor">Nichols, K.</span>, <span class="refAuthor">Jacobson, V.</span>, <span class="refAuthor">McGregor, A., Ed.</span>, and <span class="refAuthor">J. Iyengar, Ed.</span>, <span class="refTitle">"Controlled Delay Active Queue Management"</span>, <span class="seriesInfo">RFC 8289</span>, <span class="seriesInfo">DOI 10.17487/RFC8289</span>, <time datetime="2018-01" class="refDate">January 2018</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8289">https://www.rfc-editor.org/rfc/rfc8289</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="CUBACK">[CUBACK]</dt>
         <dd>
@@ -1819,13 +1906,25 @@ increases too quickly for a round-trip or two and then yields.<a href="#section-
         <dd>
 <span class="refAuthor">Ramakrishnan, K.</span>, <span class="refAuthor">Floyd, S.</span>, and <span class="refAuthor">D. Black</span>, <span class="refTitle">"The Addition of Explicit Congestion Notification (ECN) to IP"</span>, <span class="seriesInfo">RFC 3168</span>, <span class="seriesInfo">DOI 10.17487/RFC3168</span>, <time datetime="2001-09" class="refDate">September 2001</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3168">https://www.rfc-editor.org/rfc/rfc3168</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="FQ-CODEL">[FQ-CODEL]</dt>
+        <dd>
+<span class="refAuthor">Hoeiland-Joergensen, T.</span>, <span class="refAuthor">McKenney, P.</span>, <span class="refAuthor">Taht, D.</span>, <span class="refAuthor">Gettys, J.</span>, and <span class="refAuthor">E. Dumazet</span>, <span class="refTitle">"The Flow Queue CoDel Packet Scheduler and Active Queue Management Algorithm"</span>, <span class="seriesInfo">RFC 8290</span>, <span class="seriesInfo">DOI 10.17487/RFC8290</span>, <time datetime="2018-01" class="refDate">January 2018</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8290">https://www.rfc-editor.org/rfc/rfc8290</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="HYSTART">[HYSTART]</dt>
         <dd>
 <span class="refAuthor">Balasubramanian, P.</span>, <span class="refAuthor">Huang, Y.</span>, and <span class="refAuthor">M. Olson</span>, <span class="refTitle">"HyStart++: Modified Slow Start for TCP"</span>, <span class="seriesInfo">RFC 9406</span>, <span class="seriesInfo">DOI 10.17487/RFC9406</span>, <time datetime="2023-05" class="refDate">May 2023</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9406">https://www.rfc-editor.org/rfc/rfc9406</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="I-D.kazuho-ccwg-rapid-start">[I-D.kazuho-ccwg-rapid-start]</dt>
-      <dd>
+        <dd>
 <span class="refAuthor">Oku, K.</span>, <span class="refTitle">"Rapid Startup of Congestion Control"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-kazuho-ccwg-rapid-start-02</span>, <time datetime="2026-03-15" class="refDate">15 March 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-kazuho-ccwg-rapid-start-02">https://datatracker.ietf.org/doc/html/draft-kazuho-ccwg-rapid-start-02</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="L4S">[L4S]</dt>
+        <dd>
+<span class="refAuthor">Briscoe, B., Ed.</span>, <span class="refAuthor">De Schepper, K.</span>, <span class="refAuthor">Bagnulo, M.</span>, and <span class="refAuthor">G. White</span>, <span class="refTitle">"Low Latency, Low Loss, and Scalable Throughput (L4S) Internet Service: Architecture"</span>, <span class="seriesInfo">RFC 9330</span>, <span class="seriesInfo">DOI 10.17487/RFC9330</span>, <time datetime="2023-01" class="refDate">January 2023</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9330">https://www.rfc-editor.org/rfc/rfc9330</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="PRAGUE">[PRAGUE]</dt>
+      <dd>
+<span class="refAuthor">De Schepper, K.</span>, <span class="refAuthor">Tilmans, O.</span>, <span class="refAuthor">Briscoe, B.</span>, and <span class="refAuthor">V. Goel</span>, <span class="refTitle">"Prague Congestion Control"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-briscoe-iccrg-prague-congestion-control-04</span>, <time datetime="2024-07-24" class="refDate">24 July 2024</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-briscoe-iccrg-prague-congestion-control-04">https://datatracker.ietf.org/doc/html/draft-briscoe-iccrg-prague-congestion-control-04</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 </dl>
 </section>
