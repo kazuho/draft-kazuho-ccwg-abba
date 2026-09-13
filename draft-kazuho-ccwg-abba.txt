@@ -674,8 +674,8 @@ expected_high_queue_interval():
    the default 5ms threshold used by FQ-CoDel.  From there on, CUBIC
    controls the growth.
 
-   Therefore, against such a path, an ABBA sender behaves as CUBIC does,
-   while quickly fixing underutilization, including that caused
+   Therefore, at such a bottleneck, ABBA retains CUBIC's behavior while
+   shortening periods of underutilization, including those caused
    separately by packet losses.  Where the accelerated increase does
    carry the window past the marking threshold, on a longer path or
    after an overshoot, the bottleneck marks sooner and the congestion
