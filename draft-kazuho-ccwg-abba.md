@@ -87,8 +87,9 @@ steeper one. The accelerated increase is in turn bounded below that reduction,
 so under sustained congestion the sender always yields, however the round-trip
 time signal may be misread.
 
-The following subsection sets out the objective ABBA is aimed at: the delivery
-time of an object.
+The following subsections set out the objective ABBA is aimed at — the delivery
+time of an object — and how it relates to mechanisms that pursue low queueing
+delay.
 
 ## Optimizing for Object Delivery {#object-delivery}
 
@@ -138,6 +139,28 @@ acquisition and consequently object delivery. The primary application of the
 three specifications is object delivery, and therefore they accept queueing in
 pursuit of earlier delivery rather than treating the lowest round-trip time as
 the objective.
+
+
+## Relationship to Low-Latency Mechanisms {#low-latency}
+
+Loss-based congestion control and a focus on object delivery do not preclude low
+queueing delay; they place the responsibility for it in the network. Active
+queue management limits persistent queueing {{?AQM=RFC7567}}, and flow isolation
+confines the delay queue-building flow imposes to that flow, as in FQ-CoDel
+{{?FQ-CODEL=RFC8290}}. These mechanisms act on queueing in the network,
+independently of how quickly a sender acquires the bandwidth available to it.
+ABBA addresses the latter, when the congestion window is insufficient to use the
+available bandwidth. {{managed}} analyses how it behaves where such a bottleneck
+is deployed.
+
+L4S {{?L4S=RFC9330}} combines network support with scalable congestion control to
+achieve low queueing delay and high utilization. Prague can be implemented as a
+modification to CUBIC, changing the response to loss and the growth that follows
+({{Section 2.4.1 of ?PRAGUE=I-D.briscoe-iccrg-prague-congestion-control}}). It
+is possible to implement ABBA as a supplement of such a congestion control, with
+ABBA overriding the increase rate while the congestion signals are invisible.
+This combination addresses Prague's concern about slow adaptation following an
+increase in available capacity {{Section 3.1.2 of PRAGUE}}.
 
 
 # Conventions and Definitions
@@ -530,6 +553,56 @@ Because ratio is capped at half of what would reverse a reduction over one
 round-trip, a sender cannot recover a reduction before a further congestion
 signal can arrive. A sender whose round-trip time signal is misleading therefore
 increases too quickly for a round-trip or two and then yields.
+
+
+## Behavior at a Managed Bottleneck {#managed}
+
+An actively managed bottleneck typically combines three things: isolation
+between flows, congestion signalled from a shallow queue using ECN, and a buffer
+far deeper than that queue. Isolation distributes bandwidth among flows
+irrespective of how aggressively each sends, and confines the delay a
+queue-building flow creates to that flow. Aggressive signalling of congestion
+keeps the delay small, while the depth of the buffer and the use of ECN-CE
+minimize the packet drops that would cost the endpoints recovery delay.
+
+FQ-CoDel {{FQ-CODEL}} is the common instance. It hashes flows into separate
+queues and signals congestion using ECN once the queue has stood above 5ms for
+100ms (the defaults defined in {{Section 5.3 of ?CODEL=RFC8289}}). The buffer
+behind is sized for the link, 10240 packets by default, a limit the algorithm's
+own congestion signalling keep it from reaching.
+
+ABBA observes the top of such a bottleneck queue the same way it does on an
+unmanaged path. Slow start doubles the rate each round trip, and the control law
+does not act until the delay has stood above its target for an interval, so the
+queue full_rtt records is the one the overshoot built and not the one the target
+names. The two ends of the queue remain distinguishable and the conditions of
+{{increase}} can hold. A bottleneck configured to mark as soon as a shallow
+queue forms does not yield a shallow observation either: the sender doubles its
+rate over the round trip the signal takes to arrive, so full_rtt again comes out
+at about twice the idle round-trip time, as it does for a conservative slow
+start ({{full-rtt}}).
+
+Marking disarms recalibration. A CE mark is a congestion event, reduced as
+{{CUBIC}} specifies, and it refreshes last_high_queue_at ({{recalibrate}}). A
+sender whose queue is being signalled therefore does not return to slow start,
+however shallow the standing queue the bottleneck permits.
+
+The accelerated increase remains, and it engages while the round-trip time is
+within 2ms of the observed floor, minimizing moments within which the queue is
+fully drained and therefore the bottleneck path is underutilized. When the
+latency of the path is below 100ms, increase of the queue depth concludes before
+reaching 4.5ms, slightly below the default 5ms threshold used by FQ-CoDel. From
+there on, CUBIC controls the growth.
+
+Therefore, against such a path, an ABBA sender behaves as CUBIC does, while
+quickly fixing underutilization, including that caused separately by packet
+losses. Where the accelerated increase does carry the window past the marking
+threshold, on a longer path or after an overshoot, the bottleneck marks sooner
+and the congestion avoidance period is correspondingly shorter. Congestion being
+signalled by ECN-CE, that only costs a reduction of the window, which is quickly
+fixed by the accelerated increase. The shorter period does not reach other
+flows: isolation confines the queue to the flow that built it, and apportions
+bandwidth irrespective of how aggressively each sends.
 
 
 # Security Considerations {#security}
