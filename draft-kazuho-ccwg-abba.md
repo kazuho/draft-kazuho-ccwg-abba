@@ -596,11 +596,11 @@ latency of the path is below 100ms, increase of the queue depth concludes before
 reaching 4.5ms, slightly below the default 5ms threshold used by FQ-CoDel. From
 there on, CUBIC controls the growth.
 
-Therefore, against such a path, an ABBA sender behaves as CUBIC does, while
-quickly fixing underutilization, including that caused separately by packet
-losses. Where the accelerated increase does carry the window past the marking
-threshold, on a longer path or after an overshoot, the bottleneck marks sooner
-and the congestion avoidance period is correspondingly shorter. Congestion being
+Therefore, at such a bottleneck, ABBA retains CUBIC's behavior while shortening
+periods of underutilization, including those caused separately by packet losses.
+Where the accelerated increase does carry the window past the marking threshold,
+on a longer path or after an overshoot, the bottleneck marks sooner and the
+congestion avoidance period is correspondingly shorter. Congestion being
 signalled by ECN-CE, that only costs a reduction of the window, which is quickly
 fixed by the accelerated increase. The shorter period does not reach other
 flows: isolation confines the queue to the flow that built it, and apportions
