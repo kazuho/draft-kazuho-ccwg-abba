@@ -404,10 +404,8 @@ on an ECN-CE mark:               # including one received during recovery
 on a congestion event:
   bytes_accelerated = 0
   if in the slow start begun by recalibrate():
-    cwnd  = cwnd * beta_recalibration  # a different beta for the reduction
-    W_max = cwnd
-
-beta_recalibration = 1 / (2 * (2 - beta_cubic))
+    W_max = cwnd / (3 - beta_cubic)  # the window the probe reached estimates
+    cwnd  = W_max * beta_cubic       # a share; the sender then reduces from it
 
 recalibrate():
   W_max    = unset
@@ -454,11 +452,13 @@ Since the probe overflows the queue, imposing a congestion event on any other
 flow using the bottleneck, the sender waits four times longer before acting on
 evidence this weak.
 
-Recalibration must not leave the sender above its fair share. Reducing the
-window the probe reached by beta_recalibration provides that; see
-{{recalibration-fairness}}. Within that bound the sender may legitimately come
-out with more than it had, recovering bandwidth on a path where non-congestive
-loss has held the window below the available capacity.
+Recalibration is not a mechanism for obtaining more than the sender's fair
+share. The sender estimates the fair share from the window the probe reached,
+assigns that estimate to W_max, and reduces the congestion window to beta_cubic
+times it, as at any congestion event; see {{recalibration-fairness}}. Within
+that bound the sender may legitimately come out with more than it had,
+recovering bandwidth on a path where non-congestive loss has held the window
+below the available capacity.
 
 full_rtt is retaken when the recovery that ends that slow start exits, as
 described in {{full-rtt}}.
@@ -530,26 +530,34 @@ concerns.
 Two things limit what recalibration costs a competing flow. Where the queue
 cannot be observed, its frequency is cut to a quarter, one probe per eight
 expected intervals rather than two. At every probe, whether the queue was
-observable or not, the window is reduced by beta_recalibration rather than as an
-ordinary exit from slow start.
+observable or not, the window is reduced from an estimate of the sender's fair
+share rather than as an ordinary exit from slow start.
 
 Once the flows have converged, each holds path_bdp / num_flows. Under the
 asynchronous loss model one competing flow yields at a time, and what it yields
 is (1 - beta_cubic) of a share. A reduction is the only event that frees
 capacity; between reductions every flow is increasing and reclaiming it, so no
-more than one yield is ever outstanding. That single yield is the most the probe
-can take beyond the sender's own share: the path admits at most (2 - beta_cubic)
-shares, whatever the number of flows. Slow start doubles each round trip, so the
-window at the congestion event ending the probe is up to twice what the path
-admitted. beta_recalibration is therefore the reciprocal of twice
-(2 - beta_cubic), so the sender comes away with no more than a single share.
+more than one yield is ever outstanding. Approximating that reclaim as linear,
+the room standing free averages half of the yield. The sender's own window is
+below its share by as much again, averaging (1 - beta_cubic) / 2 of a
+share below it. Starting from there and reclaiming both, the probe reaches
+(3 - beta_cubic) / 2 shares, whatever the number of flows, before the path
+overflows. Slow start doubles each round trip, so the window at the congestion
+event ending the probe is twice that, (3 - beta_cubic) shares.
+
+Dividing that window by (3 - beta_cubic) estimates a share, which is the window
+at which this flow observes congestion once the path is full and the flows have
+converged. That is what W_max names, and the window the sender carries out of
+the probe is beta_cubic times it: the reduction every flow applies at the
+congestion event the probe imposed. The sender yields with its competitors
+rather than settling at the point congestion appears.
 
 ## Yielding under Sustained Congestion {#yield}
 
 No congestion signal is suppressed or deferred. Every lost packet and every
 ECN-CE mark produces the reduction the underlying controller specifies, except
-at the congestion event that ends a recalibration probe, where
-beta_recalibration reduces the window further still.
+at the congestion event that ends a recalibration probe, where the window is
+reduced from the share the probe estimated and so falls further still.
 
 Because ratio is capped at half of what would reverse a reduction over one
 round-trip, a sender cannot recover a reduction before a further congestion
