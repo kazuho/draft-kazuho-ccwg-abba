@@ -153,14 +153,16 @@ ABBA addresses the latter, when the congestion window is insufficient to use the
 available bandwidth. {{managed}} analyses how it behaves where such a bottleneck
 is deployed.
 
-L4S {{?L4S=RFC9330}} combines network support with scalable congestion control to
-achieve low queueing delay and high utilization. Prague can be implemented as a
-modification to CUBIC, changing the response to loss and the growth that follows
-({{Section 2.4.1 of ?PRAGUE=I-D.briscoe-iccrg-prague-congestion-control}}). It
-is possible to implement ABBA as a supplement of such a congestion control, with
-ABBA overriding the increase rate while the congestion signals are invisible.
-This combination addresses Prague's concern about slow adaptation following an
-increase in available capacity {{Section 3.1.2 of PRAGUE}}.
+L4S {{?L4S=RFC9330}} combines network support with scalable congestion control
+to achieve low queueing delay and high utilization. Prague can be implemented as
+a modification to CUBIC, changing the response to loss and the growth that
+follows
+({{Section 2.4.1 of ?PRAGUE=I-D.briscoe-iccrg-prague-congestion-control}}), as
+can ABBA. The two extensions can be combined, with Prague controlling the
+response to L4S congestion signals and ABBA overriding the increase rate while
+the bottleneck queue is observed to be drained. This combination addresses
+Prague's concern about slow adaptation following an increase in available
+capacity {{Section 3.1.2 of PRAGUE}}.
 
 
 # Conventions and Definitions
