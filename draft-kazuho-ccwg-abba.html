@@ -1347,14 +1347,16 @@ independently of how quickly a sender acquires the bandwidth available to it.
 ABBA addresses the latter, when the congestion window is insufficient to use the
 available bandwidth. <a href="#managed" class="auto internal xref">Section 7.4</a> analyses how it behaves where such a bottleneck
 is deployed.<a href="#section-1.2-1" class="pilcrow">¶</a></p>
-<p id="section-1.2-2">L4S <span>[<a href="#L4S" class="cite xref">L4S</a>]</span> combines network support with scalable congestion control to
-achieve low queueing delay and high utilization. Prague can be implemented as a
-modification to CUBIC, changing the response to loss and the growth that follows
-(<span><a href="https://datatracker.ietf.org/doc/html/draft-briscoe-iccrg-prague-congestion-control-04#section-2.4.1" class="relref">Section 2.4.1</a> of [<a href="#PRAGUE" class="cite xref">PRAGUE</a>]</span>). It
-is possible to implement ABBA as a supplement of such a congestion control, with
-ABBA overriding the increase rate while the congestion signals are invisible.
-This combination addresses Prague's concern about slow adaptation following an
-increase in available capacity <span><a href="https://datatracker.ietf.org/doc/html/draft-briscoe-iccrg-prague-congestion-control-04#section-3.1.2" class="relref">Section 3.1.2</a> of [<a href="#PRAGUE" class="cite xref">PRAGUE</a>]</span>.<a href="#section-1.2-2" class="pilcrow">¶</a></p>
+<p id="section-1.2-2">L4S <span>[<a href="#L4S" class="cite xref">L4S</a>]</span> combines network support with scalable congestion control
+to achieve low queueing delay and high utilization. Prague can be implemented as
+a modification to CUBIC, changing the response to loss and the growth that
+follows
+(<span><a href="https://datatracker.ietf.org/doc/html/draft-briscoe-iccrg-prague-congestion-control-04#section-2.4.1" class="relref">Section 2.4.1</a> of [<a href="#PRAGUE" class="cite xref">PRAGUE</a>]</span>), as
+can ABBA. The two extensions can be combined, with Prague controlling the
+response to L4S congestion signals and ABBA overriding the increase rate while
+the bottleneck queue is observed to be drained. This combination addresses
+Prague's concern about slow adaptation following an increase in available
+capacity <span><a href="https://datatracker.ietf.org/doc/html/draft-briscoe-iccrg-prague-congestion-control-04#section-3.1.2" class="relref">Section 3.1.2</a> of [<a href="#PRAGUE" class="cite xref">PRAGUE</a>]</span>.<a href="#section-1.2-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
