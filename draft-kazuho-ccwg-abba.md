@@ -460,6 +460,16 @@ that bound the sender may legitimately come out with more than it had,
 recovering bandwidth on a path where non-congestive loss has held the window
 below the available capacity.
 
+As the reduction is steep, immediately reducing the congestion window would
+suppress transmission for a long interval and resume it with a burst. To avoid
+both, and to pause similarly to the competing flows, which pause for
+(1 - beta_cubic) * RTT, the sender can reduce the window to
+2 / (3 - beta_cubic) of the value the probe reached, then reduce it
+further in proportion to the bytes newly acknowledged and newly declared lost,
+reaching the final value as the recovery period exits.
+{{Section 3.3 of I-D.kazuho-ccwg-rapid-start}} describes a reduction of
+this form in detail.
+
 full_rtt is retaken when the recovery that ends that slow start exits, as
 described in {{full-rtt}}.
 
