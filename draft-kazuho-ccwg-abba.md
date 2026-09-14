@@ -130,28 +130,24 @@ either congestion-avoidance mechanism. Objects that extend into congestion
 avoidance, or that are delivered over an established connection, can benefit from
 faster acquisition of a bandwidth share and recovery from underutilization.
 
-Low queueing delay is another objective a congestion controller may be optimized
-for. However, when the data of an object is already available at the sender,
-withholding it to keep the bottleneck queue short does not remove the wait; it
-changes where the data waits. What withholding does reduce is the pressure the
-sender places on competing flows to yield, which would prolong bandwidth
-acquisition and consequently object delivery. The primary application of the
-three specifications is object delivery, and therefore they accept queueing in
-pursuit of earlier delivery rather than treating the lowest round-trip time as
-the objective.
+Low queueing delay is not an objective of ABBA, because when the data of an
+object is already available at the sender, withholding it to keep the bottleneck
+queue short does not remove the wait; it changes where the data waits, and
+increases the chance of underutilizing the bottleneck. What withholding does
+reduce is the pressure the sender places on competing flows to yield, which
+would prolong bandwidth acquisition and consequently object delivery.
 
 
 ## Relationship to Low-Latency Mechanisms {#low-latency}
 
-Loss-based congestion control and a focus on object delivery do not preclude low
-queueing delay; they place the responsibility for it in the network. Active
-queue management limits persistent queueing {{?AQM=RFC7567}}, and flow isolation
-confines the delay queue-building flow imposes to that flow, as in FQ-CoDel
-{{?FQ-CODEL=RFC8290}}. These mechanisms act on queueing in the network,
-independently of how quickly a sender acquires the bandwidth available to it.
-ABBA addresses the latter, when the congestion window is insufficient to use the
-available bandwidth. {{managed}} analyses how it behaves where such a bottleneck
-is deployed.
+Even though low queueing delay is not an objective, it is not precluded either;
+the responsibility for it rests with the network. Active queue management limits
+persistent queueing {{?AQM=RFC7567}}, and flow isolation confines the delay
+queue-building flow imposes to that flow, as in FQ-CoDel {{?FQ-CODEL=RFC8290}}.
+These mechanisms act on queueing in the network, independently of how quickly a
+sender acquires the bandwidth available to it. ABBA addresses the latter, when
+the congestion window is insufficient to use the available bandwidth.
+{{managed}} analyses how it behaves where such a bottleneck is deployed.
 
 L4S {{?L4S=RFC9330}} combines network support with scalable congestion control
 to achieve low queueing delay and high utilization. Prague can be implemented as
