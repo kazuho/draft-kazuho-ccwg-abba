@@ -170,6 +170,15 @@ about slow adaptation following an increase in available capacity {{Section
 
 {::boilerplate bcp14-tagged}
 
+This document uses min_rtt, the lowest round-trip time observed over the
+lifetime of the connection, and latest_rtt and smoothed_rtt as maintained by the
+transport. beta_cubic is as defined in {{!CUBIC}}, beta is beta_cubic or, where
+the congestion event was signalled by an ECN-CE mark and the sender reduces by a
+different factor after such a mark ({{?ABE=RFC8511}}), that factor; and
+cwnd_cubic denotes the congestion window that CUBIC's congestion avoidance sets
+on an acknowledgement, whichever of its regions applies ({{Section 4.3 of
+!CUBIC}} through {{Section 4.5 of !CUBIC}}).
+
 
 # Overview {#overview}
 
@@ -177,19 +186,12 @@ ABBA models the round-trip time of the path as a function of the congestion
 window, and accelerates the increase of that window while the path delivers
 better than the model predicts.
 
-The model is a line through two points, both observed within one period between
-congestion events: the window and round-trip time at the congestion event that
-began the period, and the point of lowest round-trip time observed since. The
-first describes the path with its queue built up, the second with the queue at
-its emptiest, and the line between them says what round-trip time a window in
-that range should produce.
-
-A round-trip time below that prediction means the path is no longer the one the
-model was fitted to. Bandwidth may have been added, competing traffic may have
-departed, or the window may have been reduced by a loss that was not congestion.
-In each case the sender holds a window the path now carries with less queueing
-than the model expects, and ABBA increases the window faster than CUBIC alone
-would, by an amount taken from that discrepancy.
+A round-trip time below what the model predicts means the path is no longer the
+one the model was fitted to. Bandwidth may have been added, competing traffic
+may have departed, or the window may have been reduced by a loss that was not
+congestion. In each case the sender holds a window the path now carries with
+less queueing than the model expects, and ABBA increases the window faster than
+CUBIC alone would, by an amount taken from that discrepancy.
 
 Two points too close in round-trip time do not define a slope, and the model is
 left flat until the path has shown more variation than that. Once the window has
@@ -209,191 +211,145 @@ window and the window CUBIC sets applies, so the sender is back on CUBIC's curve
 as soon as the round-trip time rises to what the model predicts, and every
 congestion signal produces the reduction CUBIC specifies.
 
-
-# Sender State {#state}
-
-An ABBA sender maintains the following state in addition to that of CUBIC:
-
-high_cwnd, high_rtt:
-: The congestion window before the reduction at the congestion event that began
-  the current congestion-avoidance period, and the round-trip time that
-  accompanied it; see {{high}}.
-
-low_cwnd, low_rtt:
-: The congestion window and round-trip time at the point of lowest round-trip
-  time observed since that period's recovery ended; see {{fit}}. Unset until the
-  recovery exits.
-
-a, b:
-: The coefficients of the model, which predicts a round-trip time of
-  a * cwnd + b. Unset until the first fit.
-
-The sender also uses min_rtt, the lowest round-trip time observed over the
-lifetime of the connection, and latest_rtt and smoothed_rtt as maintained by the
-transport. beta_cubic is as defined in {{!CUBIC}}, beta is beta_cubic or, where
-the congestion event was signalled by an ECN-CE mark and the sender reduces by a
-different factor after such a mark ({{?ABE=RFC8511}}), that factor; and
-cwnd_cubic denotes the congestion window that CUBIC's congestion avoidance sets
-on an acknowledgement, whichever of its regions applies
-({{Section 4.3 of !CUBIC}} through {{Section 4.5 of !CUBIC}}).
-
-Two constants appear below. MIN_RTT_SPAN, 5ms, is the range of round-trip time
-the path must have demonstrated before either form of acceleration becomes
+Two constants are used. MIN_RTT_SPAN, 5ms, is the range of round-trip time the
+path must have demonstrated before either form of acceleration becomes
 available. MIN_RTT_SHORTFALL, 2ms, is how far the round-trip time must fall
 below the model's prediction before that prediction is acted upon.
-
-All of the state above is established anew at each congestion event. Where such
-an event is later determined to have been spurious
-({{Section 4.9 of !CUBIC}}), it is restored to the values it held before.
 
 
 # The Round-Trip Time Model {#model}
 
+The model is a line through two points, both observed within one period between
+congestion events: the high point, the window and round-trip time at the
+congestion event that began the period, where the queue was built up; and the
+low point, the lowest round-trip time observed since, where it was at its
+emptiest. The line between them says what round-trip time a window in that range
+should produce.
+
+An ABBA sender therefore holds four values in addition to the state of CUBIC:
+high_cwnd and high_rtt ({{high}}); low_cwnd and low_rtt ({{low}}); and the
+coefficients a and b of the line, which predicts a round-trip time of a * cwnd +
+b ({{fit}}). All are established anew at each congestion event, and where such
+an event is later determined to have been spurious ({{Section 4.9 of !CUBIC}}),
+they are restored to the values they held before.
+
 ## The High Point {#high}
 
-A congestion event is the one moment at which the sender can attribute a
-round-trip time to a known window with the queue known to be full.
+At the congestion event that begins a period, the sender records the congestion
+window before the reduction as high_cwnd. The round-trip time recorded with it
+depends on the signal: where the event was signalled by an ECN-CE mark, high_rtt
+is the lowest round-trip time observed over the round trip preceding the mark;
+otherwise it is latest_rtt, lowered to any smaller sample taken while the
+recovery period runs.
+
+The two signals place the observation differently. A loss is detected a round
+trip after the packet was sent, and the sender goes on transmitting over that
+round trip, so the queue is still full as the recovery period opens and the
+samples arriving within it continue to describe a full queue; the lowest of them
+is the conservative estimate of what a full queue costs. An ECN-CE mark instead
+reports a queue that was already persistently occupied
+({{Section 5.1 of ECN}}), so the observation to keep is the one from before the
+mark, and samples taken after it are not admitted.
+
+## The Low Point {#low}
+
+The low point is initialized when the recovery period ends, at the congestion
+window then in hand and at high_rtt. Thereafter, whenever an acknowledgement in
+congestion avoidance carries a round-trip time below low_rtt, the point moves to
+that sample and to the window that accompanied it. The model is fitted afresh on
+initialization and on every such move.
+
+It is initialized at the end of the recovery period rather than at the congestion
+event because the congestion window may still be under adjustment within that
+period. Taking high_rtt as its round-trip time leaves the two points coincident
+in round-trip time until the path shows something lower, so the model is flat
+until then.
+
+## Fitting the Line {#fit}
+
+Whenever the low point is set or moves, the line is refitted from the two points
+then in hand. Where those points do not support a line, either because the low
+point has reached or passed the high one or because their round-trip times lie
+within MIN_RTT_SPAN of each other, the previous model is kept or a flat one is
+left in its place.
 
 ~~~
-on a congestion event:
-  high_cwnd = cwnd               # before the reduction
-  high_rtt  = signalled by ECN-CE ? rtt_floor() : latest_rtt
-  unset low_cwnd, low_rtt, a, b
-
-on an acknowledgement during the recovery period:
-  if not signalled by ECN-CE and latest_rtt < high_rtt:
-    high_rtt = latest_rtt
-~~~
-
-rtt_floor() is the lowest round-trip time observed over the round trip preceding
-the call.
-
-The two signals place that moment differently. A loss is detected a round trip
-after the packet was sent, and the sender goes on transmitting over that round
-trip, so the queue is still full as the recovery period opens and the samples
-arriving within it continue to describe a full queue; the lowest of them is the
-conservative estimate of what a full queue costs. An ECN-CE mark instead reports
-a queue that was already persistently occupied
-({{Section 5.1 of ECN}}), so the observation to keep is the floor of the round
-trip that preceded the mark, and samples taken after it are not admitted.
-
-## The Low Point and the Fit {#fit}
-
-The other end of the range is the lowest round-trip time the path has shown
-since, and the window that accompanied it.
-
-~~~
-on the first acknowledgement after the recovery period ends:
-  low_cwnd = cwnd
-  low_rtt  = high_rtt
-  fit()
-
-on an acknowledgement in congestion avoidance, if latest_rtt < low_rtt:
-  low_cwnd = cwnd
-  low_rtt  = latest_rtt
-  fit()
-
 fit():
   if high_cwnd <= low_cwnd:
-    return                                     # keep the previous model
+    return                          # keep the previous model
   if high_rtt - low_rtt < MIN_RTT_SPAN:
-    a = 0                                      # flat: no prediction to invert
+    a = 0                           # flat: no prediction to invert
     b = low_rtt
-    return
-  slope = (high_rtt - low_rtt) / (high_cwnd - low_cwnd)
-  if slope >= low_rtt / low_cwnd:
-    a = low_rtt / low_cwnd                     # the line through the origin
-    b = 0
   else:
-    a = slope
-    b = low_rtt - slope * low_cwnd
+    a = min((high_rtt - low_rtt) / (high_cwnd - low_cwnd),
+            low_rtt / low_cwnd)     # capped at the line through the origin
+    b = low_rtt - a * low_cwnd
 ~~~
-
-The low point is initialized when the recovery period ends rather than at the
-congestion event, because the congestion window may still be under adjustment
-within that period. It takes high_rtt as its round-trip time, so the two points
-coincide in round-trip time until the path shows something lower, and the model
-is flat until then.
 
 A new minimum can arrive at a window at or beyond high_cwnd, which would leave
 no span to fit across. The previous model is kept in that case: refitting through
 the new point would absorb the very decline in round-trip time that the model
 exists to detect.
 
-The slope is capped at the line through the low point and the origin, the
-steepest line whose intercept is not negative; a model with a negative intercept
-is not acted upon at all ({{increase}}). The cap is shallower than the slope it
-replaces, so it predicts less round-trip time at every window beyond the low
-point, and accelerates correspondingly less.
+The cap is the line through the low point and the origin, the steepest line
+whose intercept is not negative; where it binds, b comes out at exactly zero,
+and a model with a negative intercept is not acted upon at all ({{increase}}).
+Being shallower than the slope it replaces, the cap predicts less round-trip
+time at every window beyond the low point, and accelerates correspondingly less.
 
 ## Beyond the Observed Range {#extrapolate}
 
 The fit is supported by observation only between the two points it was taken
-from. Once the window has grown well past the high point, the sender stops
-extrapolating the line and assumes instead that round-trip time is proportional
-to the window.
-
-~~~
-on an acknowledgement in congestion avoidance:
-  if b != 0 and cwnd > high_cwnd * (2 - beta):
-    a = smoothed_rtt / cwnd
-    b = 0
-~~~
-
-The test on b applies the switch to a model that is unset or affine and leaves
-one that is already proportional alone, b being zero only where a model through
+from. Once the window has grown past high_cwnd * (2 - beta), which is the window
+that signalled congestion plus the whole of the reduction taken from it, the
+sender stops extrapolating the line and assumes instead that round-trip time is
+proportional to the window: a becomes smoothed_rtt / cwnd and b zero. A model
+whose b is already zero is left alone, b being zero only where a model through
 the origin has been established.
 
-Anchoring the proportional model at the current smoothed round-trip time and the
-window in hand makes it predict that round-trip time at that window, so
-acceleration then requires the latest round-trip time to fall MIN_RTT_SHORTFALL
-below the smoothed one. An extrapolated line would instead have predicted a
-round-trip time far above anything observed, and would have found a shortfall in
-every sample.
+Anchoring at the current smoothed round-trip time and the window in hand makes
+the model predict that round-trip time at that window, so acceleration then
+requires the latest round-trip time to fall MIN_RTT_SHORTFALL below the smoothed
+one. An extrapolated line would instead have predicted a round-trip time far
+above anything observed, and would have found a shortfall in every sample.
 
 
 # Accelerated Increase {#increase}
 
-On each acknowledgement in congestion avoidance, while congestion-window
-limited, the sender sets its congestion window to abba_cwnd(cwnd, cwnd_cubic,
-bytes_acked) in place of cwnd_cubic, where cwnd is the window before that update
-and bytes_acked the data the acknowledgement newly acknowledged.
+To accelerate the increase, the congestion window is adjusted on each
+acknowledgement for which all of the following conditions are met:
+
+* the sender is in congestion avoidance,
+* the acknowledgement lies outside a recovery period,
+* the sender is limited by its congestion window.
 
 ~~~
-abba_cwnd(cwnd, cwnd_cubic, bytes_acked):
-  gain = 0
-
-  if a > 0 and b >= 0 and a * cwnd + b - latest_rtt >= MIN_RTT_SHORTFALL:
-    w_ref = (latest_rtt - b) / a
-    gain  = max(gain, (1 - w_ref / cwnd) / 2)
-
-  if high_rtt - min_rtt >= MIN_RTT_SPAN and latest_rtt < min_rtt + 2ms:
-    gain = max(gain, (min_rtt + 2ms) / latest_rtt - 1)
-
-  increase = min(bytes_acked * gain, cwnd / 2)
-  return max(cwnd + increase, cwnd_cubic)
+gain = 0
+if a > 0 and b >= 0 and a * cwnd + b - latest_rtt >= MIN_RTT_SHORTFALL:
+  w_ref = (latest_rtt - b) / a
+  gain  = max(gain, (1 - w_ref / cwnd) / 2)
+if high_rtt - min_rtt >= MIN_RTT_SPAN and latest_rtt < min_rtt + 2ms:
+  gain  = max(gain, (min_rtt + 2ms) / latest_rtt - 1)
+increase = min(bytes_acked * gain, cwnd / 2)
+cwnd = max(cwnd + increase, cwnd_cubic)
 ~~~
 
-w_ref is the window the model associates with the round-trip time actually
-observed. The path is carrying cwnd with the queueing the model predicts for
-w_ref, so the distance between them measures how far the path has moved from the
-one the model was fitted to. Half of that distance is taken per round trip:
-each acknowledgement contributes bytes_acked / cwnd of it, so a window's worth
-of acknowledgements closes half the gap.
+bytes_acked is the data the acknowledgement newly acknowledged. The accelerated
+window governs only where it exceeds cwnd_cubic, so acceleration can raise the
+congestion window but never lower it.
 
-The second candidate is the case the model cannot describe, the round-trip time
-having returned to the floor of the connection rather than merely fallen below a
-prediction. Scaling the window by (min_rtt + 2ms) / latest_rtt targets the window
-whose round-trip time would be 2ms above that floor, the window and the
-round-trip time standing in proportion at a fixed bandwidth. Requiring high_rtt
-to exceed min_rtt by MIN_RTT_SPAN keeps this out of paths whose queue never
-showed enough depth for the floor to mean anything.
-
-The greater of the two gains applies and not their sum: they are two readings of
-one quantity, not two effects to be added. The increase is capped at half the
-window per acknowledgement, and the result competes with what CUBIC would have
-set from the same window, so acceleration can raise the congestion window but
-never lower it.
+The first candidate measures how far the path has moved from the one the model
+was fitted to: the path is carrying the window with the queueing the model
+predicts for a smaller one, and half that distance is taken per round trip, each
+acknowledgement contributing its share of the window. The second is the case the
+model cannot describe, the round-trip time having returned to the floor of the
+connection rather than merely fallen below a prediction; scaling the window by
+(min_rtt + 2ms) / latest_rtt targets the window whose round-trip time would be
+2ms above that floor, the window and the round-trip time standing in proportion
+at a fixed bandwidth. Requiring high_rtt to exceed min_rtt by MIN_RTT_SPAN keeps
+it out of paths whose queue never showed enough depth for the floor to mean
+anything. The greater of the two applies and not their sum: they are two
+readings of one quantity, not two effects to be added.
 
 
 # Properties
