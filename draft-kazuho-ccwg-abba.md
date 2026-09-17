@@ -411,8 +411,9 @@ Where acceleration no longer engages, the window is held where it stands.
 CUBIC's curve climbs to meet it, and the increase is CUBIC's from there, so the
 gain is confined to the congestion-avoidance period in which it was taken.
 
-Consequently, the convergence and fairness arguments made for CUBIC ({{Section
-5.6 of !CUBIC}}) apply to ABBA as well.
+Consequently, the convergence and fairness properties of ABBA resemble those of
+CUBIC ({{Section 5.6 of !CUBIC}}), subject to the effects of acceleration
+described above.
 
 ## Yielding under Sustained Congestion {#yield}
 
