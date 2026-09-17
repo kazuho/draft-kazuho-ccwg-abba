@@ -493,8 +493,9 @@ cwnd = max(cwnd + increase, cwnd_cubic)
    from there, so the gain is confined to the congestion-avoidance
    period in which it was taken.
 
-   Consequently, the convergence and fairness arguments made for CUBIC
-   (Section 5.6 of [CUBIC]) apply to ABBA as well.
+   Consequently, the convergence and fairness properties of ABBA
+   resemble those of CUBIC (Section 5.6 of [CUBIC]), subject to the
+   effects of acceleration described above.
 
 6.2.  Yielding under Sustained Congestion
 
