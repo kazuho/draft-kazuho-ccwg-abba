@@ -213,14 +213,15 @@ window: once the round-trip time rises to what the model predicts, the window
 holds until CUBIC's curve catches up and CUBIC resumes control of the increase.
 Every congestion signal produces the reduction CUBIC specifies.
 
-The sections below use three constants:
+The sections below use four constants:
 
 * RTT_SPAN_THRESH, 5ms, the range of round-trip time the path must have
   demonstrated before either form of acceleration becomes available;
 * RTT_SHORTFALL_THRESH, 2ms, how far the round-trip time must fall below a
   predicted one before that prediction is acted upon;
 * MIN_QUEUEING, 2ms, the queueing above the minimum round-trip time below which
-  the increase is accelerated separately.
+  the increase is accelerated separately;
+* MAX_MIN_GAIN, 0.1, the most min_gain may reach.
 
 They also use rtt_floor(), a function that returns the lowest round-trip time
 observed over the last round trip.
@@ -301,9 +302,10 @@ would leave no span to fit across. The previous model is kept in that case:
 drawing a line through the new point would absorb the very decline in round-trip
 time that the model exists to detect.
 
-The slope is capped at the line through the low point and the origin. On that
-line the window is the bandwidth multiplied by the round-trip time; a steeper
-one would put the window above what the path delivers in a round trip.
+The slope is capped at the line through the low point and the origin, which
+keeps the intercept from going negative. On that line the window is the
+bandwidth multiplied by the round-trip time; a steeper one would put the window
+above what the path delivers in a round trip.
 
 ## Beyond the Observed Range {#extrapolate}
 
@@ -357,7 +359,7 @@ if a > 0 and a * cwnd + b - latest_rtt >= RTT_SHORTFALL_THRESH:
 min_gain = 0
 if high_rtt - min_rtt >= RTT_SPAN_THRESH and
    latest_rtt < min_rtt + MIN_QUEUEING:
-  min_gain = (min_rtt + MIN_QUEUEING) / latest_rtt - 1
+  min_gain = min((min_rtt + MIN_QUEUEING) / latest_rtt - 1, MAX_MIN_GAIN)
 
 gain = max(model_gain, min_gain)
 
@@ -381,11 +383,11 @@ drained, and the window is raised toward the one that would restore it.
 Requiring high_rtt to exceed min_rtt by RTT_SPAN_THRESH keeps min_gain out of
 paths whose queue never showed enough depth for the floor to mean anything.
 
-The greater of the two gains is adopted, then capped at half the window per
-acknowledgement. The result competes with what CUBIC would have set from the
-same window, so acceleration can raise the congestion window but never lower it.
-Once neither gain applies, the window holds, and once CUBIC's curve catches up,
-the increase is handled by CUBIC.
+The greater of the two gains is adopted, and the increase it yields is capped at
+half the window per acknowledgement. The result competes with what CUBIC would
+have set from the same window, so acceleration can raise the congestion window
+but never lower it. Once neither gain applies, the window holds, and once
+CUBIC's curve catches up, the increase is handled by CUBIC.
 
 
 # Properties
@@ -418,19 +420,23 @@ gain is confined to the congestion-avoidance period in which it was taken.
 No congestion signal is suppressed or deferred. Every lost packet and every
 ECN-CE mark produces the reduction the underlying controller specifies.
 
-A sender under sustained congestion does not accelerate at all. Each signal
-resets the model to flat, and the round-trip time that would refit it,
-RTT_SPAN_THRESH below the round-trip time at which congestion was last
-signalled, is by definition not what a congested path is producing. The
-proportional model of {{extrapolate}} is the other way a flat model becomes
-usable, and it requires the window to reach high_cwnd * (2 - beta), which is the
-window that signalled congestion plus the whole of the reduction taken from it;
-a path that keeps signalling congestion interrupts that growth long before. The
-second candidate of {{increase}} is gated on the same span as the first and
-additionally requires the round-trip time to be within 2ms of the floor of the
-connection. A sender whose round-trip time signal is misleading therefore
-increases too quickly for as long as the misreading lasts, and yields as soon as
-the path signals.
+Under sustained congestion a signal arrives every round trip, so the increase
+taken in the round trip that follows a reduction must not surpass that
+reduction. Neither of the two accelerated gains does.
+
+model_gain is bounded by the halving in its own definition. In one round trip,
+CUBIC never grows the window more than one and a half times ({{Section 4.2 of
+CUBIC}}), and ABBA cannot exceed that either, the halving holding model_gain
+below 1/2. Relative to the round-trip time, the discrepancy becomes the largest
+when it stays at the low point; any acknowledgement carrying a lower one moves
+the low point of the model and resets the discrepancy. At those extremes the
+line, passing through the low point, places w_ref at low_cwnd, and one round
+trip after exiting recovery model_gain is (1 - 2/3) / 2, a sixth. As that is
+below 1 / beta_ecn - 1, the model-based gain never surpasses the reduction in
+one round trip time.
+
+min_gain is held to MAX_MIN_GAIN in its own right, a tenth, which is likewise
+below 1 / beta_ecn - 1.
 
 ## Behavior at a Managed Bottleneck {#managed}
 
