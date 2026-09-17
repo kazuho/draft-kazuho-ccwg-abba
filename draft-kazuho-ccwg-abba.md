@@ -386,37 +386,28 @@ the increase is handled by CUBIC.
 
 # Properties
 
-## Where Acceleration Engages {#fairness}
+## Convergence and Fairness {#fairness}
 
-Every congestion event discards the model and the low point, and the low point
-is reinitialized at high_rtt when the recovery period ends. The span is zero
-there, so the model is flat and {{increase}} finds nothing to invert: the first
-candidate is unavailable until the path has shown RTT_SPAN_THRESH of decline
-from the round-trip time at which congestion was signalled, or the window has
-reached high_cwnd * (2 - beta) and the proportional model of {{extrapolate}} has
-taken over. The second candidate is unavailable until the round-trip time comes
-within 2ms of the floor of the connection, from a high point at least
-RTT_SPAN_THRESH above that floor. A path that keeps signalling congestion
-supplies none of these, and ABBA's window is CUBIC's throughout.
+Acceleration engages only where the path has spread its round-trip times far
+enough apart to tell one point from another: high_rtt at least RTT_SPAN_THRESH
+above the low point. Where the queue has never been deep enough for that,
+neither gain applies and the congestion-avoidance period is controlled entirely
+by CUBIC, until enough doubt accumulates that the characteristics of the path
+have changed ({{extrapolate}}).
 
-Where the decline does arrive, four things bound what follows.
+Once engaged, whether acceleration continues is decided by the round-trip time.
+Where the round-trip time rises no slower than the model predicts, there is no
+shortfall and acceleration does not engage.
 
-* The model is fitted to this flow's own observations, and a competing flow's
-  queue raises both of the points it is fitted through. What the model describes
-  is the round-trip time this path produces as this window grows, whatever else
-  is using the bottleneck.
+Where it rises more slowly, the shortfall expands and the window increase is
+accelerated: the path is carrying the larger window with less queueing than the
+model expected. It is either an indication that there is bandwidth going
+unused, or that a competing flow with a larger share has yielded. Taking it up
+is what converging on the share consists of.
 
-* Acceleration requires the round-trip time to fall RTT_SHORTFALL_THRESH below
-  the prediction, so a round-trip time merely equal to it yields nothing, and
-  the gain grows only as the shortfall does.
-
-* Extrapolation stops at high_cwnd * (2 - beta) ({{extrapolate}}). Beyond it the
-  model predicts the smoothed round-trip time at the window in hand, which is
-  the most conservative prediction available from a sample.
-
-* The window that acceleration produces competes with CUBIC's rather than
-  replacing it, and no single acknowledgement may raise the window by more than
-  half of itself.
+Where acceleration no longer engages, the window is held where it stands.
+CUBIC's curve climbs to meet it, and the increase is CUBIC's from there, so the
+gain is confined to the congestion-avoidance period in which it was taken.
 
 ## Yielding under Sustained Congestion {#yield}
 
