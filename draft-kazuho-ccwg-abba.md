@@ -168,14 +168,17 @@ deployed.
 
 {::boilerplate bcp14-tagged}
 
-This document uses min_rtt, the lowest round-trip time observed over the
-lifetime of the connection, and latest_rtt as maintained by the transport.
-beta_cubic is as defined in {{!CUBIC}}, beta is beta_cubic or, where the
-congestion event was signalled by an ECN-CE mark and the sender reduces by a
-different factor after such a mark ({{?ABE=RFC8511}}), that factor; and
-cwnd_cubic denotes the congestion window that CUBIC's congestion avoidance sets
-on an acknowledgement, whichever of its regions applies ({{Section 4.3 of
-!CUBIC}} through {{Section 4.5 of !CUBIC}}).
+This document uses the notation of {{!CUBIC}}, in which window sizes are
+expressed in segments of the SMSS.
+
+It also uses min_rtt, the lowest round-trip time observed over the lifetime of
+the connection, and latest_rtt as maintained by the transport. beta_cubic is as
+defined in {{!CUBIC}}, beta is beta_cubic or, where the congestion event was
+signalled by an ECN-CE mark and the sender reduces by a different factor after
+such a mark ({{?ABE=RFC8511}}), that factor; and cwnd_cubic denotes the
+congestion window that CUBIC's congestion avoidance sets on an acknowledgement,
+whichever of its regions applies ({{Section 4.3 of !CUBIC}} through {{Section
+4.5 of !CUBIC}}).
 
 
 # Overview {#overview}
@@ -358,12 +361,13 @@ if high_rtt - min_rtt >= RTT_SPAN_THRESH and
 
 gain = max(model_gain, min_gain)
 
-increase = min(bytes_acked * gain, cwnd / 2)
+increase = min(segments_acked * gain, cwnd / 2)
 
 cwnd = max(cwnd + increase, cwnd_cubic)
 ~~~
 
-bytes_acked is the data the acknowledgement newly acknowledged.
+segments_acked is the number of segments the acknowledgement newly
+acknowledged.
 
 model_gain measures how far the path has moved from the one the model was fitted
 to. If the round-trip time the model predicts is no less than latest_rtt +
