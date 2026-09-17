@@ -205,16 +205,22 @@ sender accelerates toward a window whose round-trip time would exceed the floor
 by a small fixed margin.
 
 Neither candidate replaces CUBIC's own increase. The greater of the accelerated
-window and the window CUBIC sets applies, so the sender is back on CUBIC's curve
-as soon as the round-trip time rises to what the model predicts, and every
-congestion signal produces the reduction CUBIC specifies.
+window and the window CUBIC sets applies, so acceleration can only raise the
+window: once the round-trip time rises to what the model predicts, the window
+holds until CUBIC's curve catches up and CUBIC resumes control of the increase.
+Every congestion signal produces the reduction CUBIC specifies.
 
-The sections below use two constants and one derived quantity. MIN_RTT_SPAN,
-5ms, is the range of round-trip time the path must have demonstrated before
-either form of acceleration becomes available. MIN_RTT_SHORTFALL, 2ms, is how
-far the round-trip time must fall below the model's prediction before that
-prediction is acted upon. rtt_floor() is the lowest round-trip time observed
-over the round trip preceding the call.
+The sections below use three constants:
+
+* RTT_SPAN_THRESH, 5ms, the range of round-trip time the path must have
+  demonstrated before either form of acceleration becomes available;
+* RTT_SHORTFALL_THRESH, 2ms, how far the round-trip time must fall below a
+  predicted one before that prediction is acted upon;
+* MIN_QUEUEING, 2ms, the queueing above the minimum round-trip time below which
+  the increase is accelerated separately.
+
+They also use rtt_floor(), a function that returns the lowest round-trip time
+observed over the last round trip.
 
 
 # The Round-Trip Time Model {#model}
@@ -226,12 +232,15 @@ low point, the lowest round-trip time observed since, where it was at its
 emptiest. The line between them says what round-trip time a window in that range
 should produce.
 
-An ABBA sender therefore holds four values in addition to the state of CUBIC:
-high_cwnd and high_rtt ({{high}}); low_cwnd and low_rtt ({{low}}); and the
-coefficients a and b of the line, which predicts a round-trip time of a * cwnd +
-b ({{fit}}). All are established anew at each congestion event, and where such
-an event is later determined to have been spurious ({{Section 4.9 of !CUBIC}}),
-they are restored to the values they held before.
+An ABBA sender therefore holds the following in addition to the state of CUBIC:
+
+* high_cwnd and high_rtt, the high point ({{high}});
+* low_cwnd and low_rtt, the low point ({{low}});
+* a and b, the coefficients of the line, unset until a fit succeeds ({{fit}}).
+
+All are established anew at each congestion event, and where such an event is
+later determined to have been spurious ({{Section 4.9 of !CUBIC}}), they are
+restored to the values they held before.
 
 ## The High Point {#high}
 
@@ -260,22 +269,22 @@ that sample and to the window that accompanied it. The model is fitted afresh on
 initialization and on every such move.
 
 By taking high_rtt initially as the low point's round-trip time, the model
-starts flat and remains so until the path shows a round-trip time MIN_RTT_SPAN
-below it.
+starts flat and remains so until the path shows a round-trip time
+RTT_SPAN_THRESH below it.
 
 ## Fitting the Line {#fit}
 
 Whenever the low point is set or moves, the line is reevaluated from the two
 points then in hand. Where those points do not support a line, either because
 the low point has reached or passed the high one or because their round-trip
-times lie within MIN_RTT_SPAN of each other, the previous model is kept or a
+times lie within RTT_SPAN_THRESH of each other, the previous model is kept or a
 flat one is left in its place.
 
 ~~~
 fit():
   if high_cwnd <= low_cwnd:
     return                          # keep the previous model
-  if high_rtt - low_rtt < MIN_RTT_SPAN:
+  if high_rtt - low_rtt < RTT_SPAN_THRESH:
     a = 0                           # flat: no prediction to invert
     b = low_rtt
   else:
@@ -317,6 +326,7 @@ if cwnd > high_cwnd * (2 - beta):
   rtt_target = rtt_floor()
   if b is set:
     rtt_target = max(rtt_target, a * cwnd + b)
+
   a = rtt_target / cwnd
   b = 0
 ~~~
@@ -327,40 +337,51 @@ line.
 
 # Accelerated Increase {#increase}
 
-To accelerate the increase, the congestion window is adjusted on each
-acknowledgement for which all of the following conditions are met:
+To accelerate the increase, when all of the following conditions are met:
 
 * the sender is in congestion avoidance,
 * the acknowledgement lies outside a recovery period,
-* the sender is limited by its congestion window.
+* the sender is limited by its congestion window,
+
+the congestion window is adjusted on each acknowledgement as follows.
 
 ~~~
-gain = 0
-if a > 0 and b >= 0 and a * cwnd + b - latest_rtt >= MIN_RTT_SHORTFALL:
-  w_ref = (latest_rtt - b) / a
-  gain  = max(gain, (1 - w_ref / cwnd) / 2)
-if high_rtt - min_rtt >= MIN_RTT_SPAN and latest_rtt < min_rtt + 2ms:
-  gain  = max(gain, (min_rtt + 2ms) / latest_rtt - 1)
+model_gain = 0
+if a > 0 and a * cwnd + b - latest_rtt >= RTT_SHORTFALL_THRESH:
+  w_ref      = (latest_rtt - b) / a
+  model_gain = (1 - w_ref / cwnd) / 2
+
+min_gain = 0
+if high_rtt - min_rtt >= RTT_SPAN_THRESH and
+   latest_rtt < min_rtt + MIN_QUEUEING:
+  min_gain = (min_rtt + MIN_QUEUEING) / latest_rtt - 1
+
+gain = max(model_gain, min_gain)
+
 increase = min(bytes_acked * gain, cwnd / 2)
+
 cwnd = max(cwnd + increase, cwnd_cubic)
 ~~~
 
-bytes_acked is the data the acknowledgement newly acknowledged. The accelerated
-window governs only where it exceeds cwnd_cubic, so acceleration can raise the
-congestion window but never lower it.
+bytes_acked is the data the acknowledgement newly acknowledged.
 
-The first candidate measures how far the path has moved from the one the model
-was fitted to: the path is carrying the window with the queueing the model
-predicts for a smaller one, and half that distance is taken per round trip, each
-acknowledgement contributing its share of the window. The second is the case the
-model cannot describe, the round-trip time having returned to the floor of the
-connection rather than merely fallen below a prediction; scaling the window by
-(min_rtt + 2ms) / latest_rtt targets the window whose round-trip time would be
-2ms above that floor, the window and the round-trip time standing in proportion
-at a fixed bandwidth. Requiring high_rtt to exceed min_rtt by MIN_RTT_SPAN keeps
-it out of paths whose queue never showed enough depth for the floor to mean
-anything. The greater of the two applies and not their sum: they are two
-readings of one quantity, not two effects to be added.
+model_gain measures how far the path has moved from the one the model was fitted
+to. If the round-trip time the model predicts is no less than latest_rtt +
+RTT_SHORTFALL_THRESH, the path has room the window is not using, and half of
+that room is taken each round trip.
+
+min_gain covers the case the model cannot describe, the round-trip time having
+returned to the floor of the connection rather than merely fallen below a fitted
+line. If latest_rtt is below min_rtt + MIN_QUEUEING, the queue has all but
+drained, and the window is raised toward the one that would restore it.
+Requiring high_rtt to exceed min_rtt by RTT_SPAN_THRESH keeps min_gain out of
+paths whose queue never showed enough depth for the floor to mean anything.
+
+The greater of the two gains is adopted, then capped at half the window per
+acknowledgement. The result competes with what CUBIC would have set from the
+same window, so acceleration can raise the congestion window but never lower it.
+Once neither gain applies, the window holds, and once CUBIC's curve catches up,
+the increase is handled by CUBIC.
 
 
 # Properties
@@ -370,13 +391,13 @@ readings of one quantity, not two effects to be added.
 Every congestion event discards the model and the low point, and the low point
 is reinitialized at high_rtt when the recovery period ends. The span is zero
 there, so the model is flat and {{increase}} finds nothing to invert: the first
-candidate is unavailable until the path has shown MIN_RTT_SPAN of decline from
-the round-trip time at which congestion was signalled, or the window has reached
-high_cwnd * (2 - beta) and the proportional model of {{extrapolate}} has taken
-over. The second candidate is unavailable until the round-trip time comes within
-2ms of the floor of the connection, from a high point at least
-MIN_RTT_SPAN above that floor. A path that keeps signalling congestion supplies
-none of these, and ABBA's window is CUBIC's throughout.
+candidate is unavailable until the path has shown RTT_SPAN_THRESH of decline
+from the round-trip time at which congestion was signalled, or the window has
+reached high_cwnd * (2 - beta) and the proportional model of {{extrapolate}} has
+taken over. The second candidate is unavailable until the round-trip time comes
+within 2ms of the floor of the connection, from a high point at least
+RTT_SPAN_THRESH above that floor. A path that keeps signalling congestion
+supplies none of these, and ABBA's window is CUBIC's throughout.
 
 Where the decline does arrive, four things bound what follows.
 
@@ -385,9 +406,9 @@ Where the decline does arrive, four things bound what follows.
   is the round-trip time this path produces as this window grows, whatever else
   is using the bottleneck.
 
-* Acceleration requires the round-trip time to fall MIN_RTT_SHORTFALL below the
-  prediction, so a round-trip time merely equal to it yields nothing, and the
-  gain grows only as the shortfall does.
+* Acceleration requires the round-trip time to fall RTT_SHORTFALL_THRESH below
+  the prediction, so a round-trip time merely equal to it yields nothing, and
+  the gain grows only as the shortfall does.
 
 * Extrapolation stops at high_cwnd * (2 - beta) ({{extrapolate}}). Beyond it the
   model predicts the smoothed round-trip time at the window in hand, which is
@@ -404,16 +425,17 @@ ECN-CE mark produces the reduction the underlying controller specifies.
 
 A sender under sustained congestion does not accelerate at all. Each signal
 resets the model to flat, and the round-trip time that would refit it,
-MIN_RTT_SPAN below the round-trip time at which congestion was last signalled,
-is by definition not what a congested path is producing. The proportional model
-of {{extrapolate}} is the other way a flat model becomes usable, and it requires
-the window to reach high_cwnd * (2 - beta), which is the window that signalled
-congestion plus the whole of the reduction taken from it; a path that keeps
-signalling congestion interrupts that growth long before. The second candidate
-of {{increase}} is gated on the same span as the first and additionally requires
-the round-trip time to be within 2ms of the floor of the connection. A sender
-whose round-trip time signal is misleading therefore increases too quickly for
-as long as the misreading lasts, and yields as soon as the path signals.
+RTT_SPAN_THRESH below the round-trip time at which congestion was last
+signalled, is by definition not what a congested path is producing. The
+proportional model of {{extrapolate}} is the other way a flat model becomes
+usable, and it requires the window to reach high_cwnd * (2 - beta), which is the
+window that signalled congestion plus the whole of the reduction taken from it;
+a path that keeps signalling congestion interrupts that growth long before. The
+second candidate of {{increase}} is gated on the same span as the first and
+additionally requires the round-trip time to be within 2ms of the floor of the
+connection. A sender whose round-trip time signal is misleading therefore
+increases too quickly for as long as the misreading lasts, and yields as soon as
+the path signals.
 
 ## Behavior at a Managed Bottleneck {#managed}
 
@@ -436,11 +458,11 @@ event of a connection ends slow start and carries its overshoot, so high_rtt
 comes out well above the floor; every event after that is raised from the queue
 the bottleneck permits to stand, and the decline available afterwards is about
 that queue's depth. At FQ-CoDel's default target of 5ms the span sits exactly at
-MIN_RTT_SPAN, and where the target is larger, as {{Section 5.2.2 of FQ-CODEL}}
-recommends for slow links, it clears it comfortably.
+RTT_SPAN_THRESH, and where the target is larger, as {{Section 5.2.2 of
+FQ-CODEL}} recommends for slow links, it clears it comfortably.
 
 {::comment}
-The marginality at the 5ms default deserves a second opinion: MIN_RTT_SPAN is
+The marginality at the 5ms default deserves a second opinion: RTT_SPAN_THRESH is
 5ms and CoDel's target is 5ms, so whether the model fits at all at such a
 bottleneck turns on where the samples land either side of the setpoint. Worth
 checking against the CoDel traces.
