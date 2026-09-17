@@ -146,11 +146,10 @@ Table of Contents
    ABBA does not suppress or defer any congestion response: every lost
    packet and every ECN-CE mark [ECN] produces the reduction CUBIC
    specifies.  The model is moreover discarded at every congestion
-   event, and what replaces it accelerates only once the path has shown
-   the round-trip time falling materially below the value at which
-   congestion was signalled, or the window has grown well past the one
-   that signalled it.  A sender under sustained congestion reaches
-   neither, and does not accelerate at all.
+   event, and the increase taken in the round trip that follows a
+   reduction never surpasses that reduction.  A sender under sustained
+   congestion, where a signal arrives every round trip, therefore
+   yields.
 
    The following subsections set out the objective ABBA is aimed at —
    the delivery time of an object — and how it relates to mechanisms
