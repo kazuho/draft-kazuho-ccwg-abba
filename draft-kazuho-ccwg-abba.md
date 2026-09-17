@@ -323,7 +323,7 @@ than that, the sender has been chasing the higher value, and the line is drawn
 through that instead.
 
 ~~~
-if cwnd > high_cwnd * (2 - beta):
+if b != 0 and cwnd > high_cwnd * (2 - beta):
   rtt_target = rtt_floor()
   if b is set:
     rtt_target = max(rtt_target, a * cwnd + b)
