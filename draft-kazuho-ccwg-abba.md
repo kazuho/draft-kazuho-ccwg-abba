@@ -143,15 +143,13 @@ reduce is the pressure the sender places on competing flows to yield, which
 would prolong bandwidth acquisition and consequently object delivery.
 
 
-## Relationship to Low-Latency Mechanisms {#low-latency}
+## Relationship to Active Queue Management {#low-latency}
 
 Even though low queueing delay is not an objective, it is not precluded either.
-
-Active queue management limits persistent queueing {{?AQM=RFC7567}}, and flow
-isolation confines the delay a queue-building flow creates to that flow.
-FQ-CoDel {{?FQ-CODEL=RFC8290}} provides both: each flow is given a queue of its
-own, and congestion is signalled once that queue has stood above a shallow
-target.
+Active queue management is used to enforce short queueing delays
+{{?AQM=RFC7567}}, but that leads to occasional starvation of the bottleneck
+queue, and hence to underutilization of the link, especially on paths where the
+available bandwidth changes rapidly. ABBA provides the needed mitigation.
 
 Being clocked by acknowledgements, an ABBA sender follows the rate the
 bottleneck is delivering. Where the bandwidth falls, the delay the queue imposes
