@@ -160,8 +160,7 @@ immediately. Where the round-trip time stays flat or falls, the sender raises
 its window quickly and takes up whatever is there. Where the available bandwidth
 varies continually, as on a radio path, the sender's rate therefore follows the
 fluctuation, while the queueing delay stays near the target the bottleneck
-signals at. {{managed}} analyses how ABBA behaves where such a bottleneck is
-deployed.
+signals at.
 
 
 # Conventions and Definitions
@@ -437,63 +436,6 @@ one round trip time.
 
 min_gain is held to MAX_MIN_GAIN in its own right, a tenth, which is likewise
 below 1 / beta_ecn - 1.
-
-## Behavior at a Managed Bottleneck {#managed}
-
-An actively managed bottleneck typically combines three things: isolation
-between flows, congestion signalled from a shallow queue using ECN, and a buffer
-far deeper than that queue. Isolation distributes bandwidth among flows
-irrespective of how aggressively each sends, and confines the delay a
-queue-building flow creates to that flow. Aggressive signalling of congestion
-keeps the delay small, while the depth of the buffer and the use of ECN-CE
-minimize the packet drops that would cost the endpoints recovery delay.
-
-FQ-CoDel {{FQ-CODEL}} is the common instance. It hashes flows into separate
-queues and signals congestion using ECN once the queue has stood above 5ms for
-100ms (the defaults defined in {{Section 5.3 of ?CODEL=RFC8289}}). The buffer
-behind is sized for the link, 10240 packets by default, a limit the algorithm's
-own congestion signalling keeps it from reaching.
-
-The span such a bottleneck offers is its own setpoint. The first congestion
-event of a connection ends slow start and carries its overshoot, so high_rtt
-comes out well above the floor; every event after that is raised from the queue
-the bottleneck permits to stand, and the decline available afterwards is about
-that queue's depth. At FQ-CoDel's default target of 5ms the span sits exactly at
-RTT_SPAN_THRESH, and where the target is larger, as {{Section 5.2.2 of
-FQ-CODEL}} recommends for slow links, it clears it comfortably.
-
-{::comment}
-The marginality at the 5ms default deserves a second opinion: RTT_SPAN_THRESH is
-5ms and CoDel's target is 5ms, so whether the model fits at all at such a
-bottleneck turns on where the samples land either side of the setpoint. Worth
-checking against the CoDel traces.
-{:/comment}
-
-A queue that shallow is where CUBIC is least able to keep the path busy, and
-where acceleration is of most use. Each signal removes (1 - beta) of the window,
-and where the queue the signal was raised over holds less than the reduction
-removes, the sender comes out below the bandwidth-delay product and the
-bottleneck idles until the window is restored. Against a 5ms setpoint that is
-every path whose idle round-trip time exceeds 5ms * beta / (1 - beta): 11.7ms
-where beta is 0.7, and 28.3ms where the sender applies the ECN factor of 0.85
-that {{ABE}} recommends. The time CUBIC takes to restore the window grows with
-the cube root of the amount removed ({{Section 4.2 of CUBIC}}), so on a large
-window it is measured in seconds, and a further signal arriving before then
-leaves the sender lower still. Scalable congestion controls address this by
-reducing in proportion to the extent of the marking; ABBA addresses it from the
-other side, the round-trip time falling below the model being exactly what a
-window below the bandwidth-delay product produces.
-
-Therefore, at such a bottleneck, ABBA retains CUBIC's behavior while shortening
-periods of underutilization, including those caused separately by packet losses.
-Where the accelerated increase does carry the window past the marking threshold,
-on a longer path or after an overshoot, the bottleneck marks sooner and the
-congestion avoidance period is correspondingly shorter. Congestion being
-signalled by ECN-CE, that only costs a reduction of the window, which is quickly
-fixed by the accelerated increase. The shorter period does not reach other
-flows: isolation confines the queue to the flow that built it, and apportions
-bandwidth irrespective of how aggressively each sends.
-
 
 # Security Considerations {#security}
 
