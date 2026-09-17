@@ -1159,7 +1159,7 @@ specifies.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
                 <p id="section-toc.1-1.1.2.1.1" class="keepWithNext"><a href="#section-1.1" class="auto internal xref">1.1</a>.  <a href="#name-optimizing-for-object-deliv" class="internal xref">Optimizing for Object Delivery</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1.2.2">
-                <p id="section-toc.1-1.1.2.2.1" class="keepWithNext"><a href="#section-1.2" class="auto internal xref">1.2</a>.  <a href="#name-relationship-to-low-latency" class="internal xref">Relationship to Low-Latency Mechanisms</a></p>
+                <p id="section-toc.1-1.1.2.2.1" class="keepWithNext"><a href="#section-1.2" class="auto internal xref">1.2</a>.  <a href="#name-relationship-to-active-queu" class="internal xref">Relationship to Active Queue Management</a></p>
 </li>
             </ul>
 </li>
@@ -1330,23 +1330,22 @@ would prolong bandwidth acquisition and consequently object delivery.<a href="#s
 </div>
 <div id="low-latency">
 <section id="section-1.2">
-        <h3 id="name-relationship-to-low-latency">
-<a href="#section-1.2" class="section-number selfRef">1.2. </a><a href="#name-relationship-to-low-latency" class="section-name selfRef">Relationship to Low-Latency Mechanisms</a>
+        <h3 id="name-relationship-to-active-queu">
+<a href="#section-1.2" class="section-number selfRef">1.2. </a><a href="#name-relationship-to-active-queu" class="section-name selfRef">Relationship to Active Queue Management</a>
         </h3>
-<p id="section-1.2-1">Even though low queueing delay is not an objective, it is not precluded either.<a href="#section-1.2-1" class="pilcrow">¶</a></p>
-<p id="section-1.2-2">Active queue management limits persistent queueing <span>[<a href="#AQM" class="cite xref">AQM</a>]</span>, and flow
-isolation confines the delay a queue-building flow creates to that flow.
-FQ-CoDel <span>[<a href="#FQ-CODEL" class="cite xref">FQ-CODEL</a>]</span> provides both: each flow is given a queue of its
-own, and congestion is signalled once that queue has stood above a shallow
-target.<a href="#section-1.2-2" class="pilcrow">¶</a></p>
-<p id="section-1.2-3">Being clocked by acknowledgements, an ABBA sender follows the rate the
+<p id="section-1.2-1">Even though low queueing delay is not an objective, it is not precluded either.
+Active queue management is used to enforce short queueing delays
+<span>[<a href="#AQM" class="cite xref">AQM</a>]</span>, but that leads to occasional starvation of the bottleneck
+queue, and hence to underutilization of the link, especially on paths where the
+available bandwidth changes rapidly. ABBA provides the needed mitigation.<a href="#section-1.2-1" class="pilcrow">¶</a></p>
+<p id="section-1.2-2">Being clocked by acknowledgements, an ABBA sender follows the rate the
 bottleneck is delivering. Where the bandwidth falls, the delay the queue imposes
 rises, and the bottleneck signals congestion. In response, the sender yields
 immediately. Where the round-trip time stays flat or falls, the sender raises
 its window quickly and takes up whatever is there. Where the available bandwidth
 varies continually, as on a radio path, the sender's rate therefore follows the
 fluctuation, while the queueing delay stays near the target the bottleneck
-signals at.<a href="#section-1.2-3" class="pilcrow">¶</a></p>
+signals at.<a href="#section-1.2-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -1729,10 +1728,6 @@ below 1 / beta_ecn - 1.<a href="#section-6.2-4" class="pilcrow">¶</a></p>
 <dt id="ECN">[ECN]</dt>
         <dd>
 <span class="refAuthor">Ramakrishnan, K.</span>, <span class="refAuthor">Floyd, S.</span>, and <span class="refAuthor">D. Black</span>, <span class="refTitle">"The Addition of Explicit Congestion Notification (ECN) to IP"</span>, <span class="seriesInfo">RFC 3168</span>, <span class="seriesInfo">DOI 10.17487/RFC3168</span>, <time datetime="2001-09" class="refDate">September 2001</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3168">https://www.rfc-editor.org/rfc/rfc3168</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="FQ-CODEL">[FQ-CODEL]</dt>
-        <dd>
-<span class="refAuthor">Hoeiland-Joergensen, T.</span>, <span class="refAuthor">McKenney, P.</span>, <span class="refAuthor">Taht, D.</span>, <span class="refAuthor">Gettys, J.</span>, and <span class="refAuthor">E. Dumazet</span>, <span class="refTitle">"The Flow Queue CoDel Packet Scheduler and Active Queue Management Algorithm"</span>, <span class="seriesInfo">RFC 8290</span>, <span class="seriesInfo">DOI 10.17487/RFC8290</span>, <time datetime="2018-01" class="refDate">January 2018</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8290">https://www.rfc-editor.org/rfc/rfc8290</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="I-D.kazuho-ccwg-rapid-start">[I-D.kazuho-ccwg-rapid-start]</dt>
       <dd>

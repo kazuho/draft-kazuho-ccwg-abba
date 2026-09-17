@@ -69,7 +69,7 @@ Table of Contents
 
    1.  Introduction
      1.1.  Optimizing for Object Delivery
-     1.2.  Relationship to Low-Latency Mechanisms
+     1.2.  Relationship to Active Queue Management
    2.  Conventions and Definitions
    3.  Overview
    4.  The Round-Trip Time Model
@@ -202,16 +202,14 @@ Table of Contents
    places on competing flows to yield, which would prolong bandwidth
    acquisition and consequently object delivery.
 
-1.2.  Relationship to Low-Latency Mechanisms
+1.2.  Relationship to Active Queue Management
 
    Even though low queueing delay is not an objective, it is not
-   precluded either.
-
-   Active queue management limits persistent queueing [AQM], and flow
-   isolation confines the delay a queue-building flow creates to that
-   flow.  FQ-CoDel [FQ-CODEL] provides both: each flow is given a queue
-   of its own, and congestion is signalled once that queue has stood
-   above a shallow target.
+   precluded either.  Active queue management is used to enforce short
+   queueing delays [AQM], but that leads to occasional starvation of the
+   bottleneck queue, and hence to underutilization of the link,
+   especially on paths where the available bandwidth changes rapidly.
+   ABBA provides the needed mitigation.
 
    Being clocked by acknowledgements, an ABBA sender follows the rate
    the bottleneck is delivering.  Where the bandwidth falls, the delay
@@ -566,12 +564,6 @@ cwnd = max(cwnd + increase, cwnd_cubic)
               of Explicit Congestion Notification (ECN) to IP",
               RFC 3168, DOI 10.17487/RFC3168, September 2001,
               <https://www.rfc-editor.org/rfc/rfc3168>.
-
-   [FQ-CODEL] Hoeiland-Joergensen, T., McKenney, P., Taht, D., Gettys,
-              J., and E. Dumazet, "The Flow Queue CoDel Packet Scheduler
-              and Active Queue Management Algorithm", RFC 8290,
-              DOI 10.17487/RFC8290, January 2018,
-              <https://www.rfc-editor.org/rfc/rfc8290>.
 
    [I-D.kazuho-ccwg-rapid-start]
               Oku, K., "Rapid Startup of Congestion Control", Work in
