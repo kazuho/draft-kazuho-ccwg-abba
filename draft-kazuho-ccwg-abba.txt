@@ -494,6 +494,9 @@ cwnd = max(cwnd + increase, cwnd_cubic)
    from there, so the gain is confined to the congestion-avoidance
    period in which it was taken.
 
+   Consequently, the convergence and fairness arguments made for CUBIC
+   (Section 5.6 of [CUBIC]) apply to ABBA as well.
+
 6.2.  Yielding under Sustained Congestion
 
    No congestion signal is suppressed or deferred.  Every lost packet
