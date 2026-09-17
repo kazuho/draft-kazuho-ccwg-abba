@@ -1539,7 +1539,7 @@ than that, the sender has been chasing the higher value, and the line is drawn
 through that instead.<a href="#section-4.4-2" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-4.4-3">
 <pre>
-if cwnd &gt; high_cwnd * (2 - beta):
+if b != 0 and cwnd &gt; high_cwnd * (2 - beta):
   rtt_target = rtt_floor()
   if b is set:
     rtt_target = max(rtt_target, a * cwnd + b)
