@@ -145,25 +145,23 @@ would prolong bandwidth acquisition and consequently object delivery.
 
 ## Relationship to Low-Latency Mechanisms {#low-latency}
 
-Even though low queueing delay is not an objective, it is not precluded either;
-the responsibility for it rests with the network. Active queue management limits
-persistent queueing {{?AQM=RFC7567}}, and flow isolation confines the delay
-queue-building flow imposes to that flow, as in FQ-CoDel {{?FQ-CODEL=RFC8290}}.
-These mechanisms act on queueing in the network, independently of how quickly a
-sender acquires the bandwidth available to it. ABBA addresses the latter, when
-the congestion window is insufficient to use the available bandwidth.
-{{managed}} analyses how it behaves where such a bottleneck is deployed.
+Even though low queueing delay is not an objective, it is not precluded either.
 
-L4S {{?L4S=RFC9330}} combines network support with scalable congestion control
-to achieve low queueing delay and high utilization. Prague can be implemented as
-a modification to CUBIC, changing the response to loss and the growth that
-follows ({{Section 2.4.1 of
-?PRAGUE=I-D.briscoe-iccrg-prague-congestion-control}}), as can ABBA. The two
-extensions can be combined, with Prague controlling the response to L4S
-congestion signals and ABBA overriding the increase rate while the path delivers
-better than its model predicts. This combination addresses Prague's concern
-about slow adaptation following an increase in available capacity {{Section
-3.1.2 of PRAGUE}}.
+Active queue management limits persistent queueing {{?AQM=RFC7567}}, and flow
+isolation confines the delay a queue-building flow creates to that flow.
+FQ-CoDel {{?FQ-CODEL=RFC8290}} provides both: each flow is given a queue of its
+own, and congestion is signalled once that queue has stood above a shallow
+target.
+
+Being clocked by acknowledgements, an ABBA sender follows the rate the
+bottleneck is delivering. Where the bandwidth falls, the delay the queue imposes
+rises, and the bottleneck signals congestion. In response, the sender yields
+immediately. Where the round-trip time stays flat or falls, the sender raises
+its window quickly and takes up whatever is there. Where the available bandwidth
+varies continually, as on a radio path, the sender's rate therefore follows the
+fluctuation, while the queueing delay stays near the target the bottleneck
+signals at. {{managed}} analyses how ABBA behaves where such a bottleneck is
+deployed.
 
 
 # Conventions and Definitions
