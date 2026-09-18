@@ -369,30 +369,40 @@ CUBIC.
 
 ## Convergence and Fairness {#fairness}
 
-Acceleration engages only where the path has spread its round-trip times far
-enough apart to tell one point from another: high_rtt at least RTT_SPAN_THRESH
-above the low point. Where the queue has never been deep enough for that,
-neither gain applies and the congestion-avoidance period is controlled entirely
-by CUBIC, until enough doubt accumulates that the characteristics of the path
-have changed ({{extrapolate}}).
+Within the observed range, acceleration requires high_rtt to exceed low_rtt
+by at least RTT_SPAN_THRESH. Until that span has been observed, window growth
+is controlled entirely by CUBIC, unless the window exceeds the threshold for
+extrapolation ({{extrapolate}}).
 
-Once engaged, whether acceleration continues is decided by the round-trip time.
-Where the round-trip time rises no slower than the model predicts, there is no
-shortfall and acceleration does not engage.
+On a path whose bandwidth, idle delay, and queue capacity remain stable,
+acceleration is expected to remain inactive when flows are near convergence
+or when the sender is yielding share to competing traffic. Near convergence,
+the fitted relationship should remain representative; when the sender is
+yielding share, competing traffic increases the queueing its window encounters.
+Retaining only two thirds of the fitted slope leaves a margin for variation
+in that relationship.
 
-Where it rises more slowly, the shortfall expands and the window increase is
-accelerated: the path is carrying the larger window with less queueing than the
-model expected. It is either an indication that there is bandwidth going
-unused, or that a competing flow with a larger share has yielded. Taking it up
-is what converging on the share consists of.
+Whether acceleration engages is decided by the round-trip time. Where it meets
+or exceeds the model's prediction, there is no shortfall and window growth
+remains controlled by CUBIC.
 
-Where acceleration no longer engages, the window is held where it stands.
-CUBIC's curve climbs to meet it, and the increase is CUBIC's from there, so the
-gain is confined to the congestion-avoidance period in which it was taken.
+Where the round-trip time falls below that prediction, the path is carrying the
+window with less queueing than the model expected. This can indicate unused
+bandwidth or capacity released by competing traffic. Under additive increase
+and multiplicative decrease, flows holding larger windows release more capacity
+when they yield, while additive increase lets flows holding smaller windows
+catch up. ABBA accelerates that acquisition where the round-trip time
+observations permit it, supporting the same convergence process.
+
+Where acceleration no longer engages, the window is held where it stands until
+CUBIC's curve catches up. Subsequent growth is then controlled by CUBIC, unless
+a new shortfall permits acceleration again. Every congestion event retains
+CUBIC's reduction and discards the model.
 
 Consequently, the convergence and fairness properties of ABBA resemble those of
 CUBIC ({{Section 5.6 of !CUBIC}}), subject to the effects of acceleration
 described above.
+
 
 ## Yielding under Sustained Congestion {#yield}
 
