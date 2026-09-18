@@ -145,19 +145,21 @@ would prolong bandwidth acquisition and consequently object delivery.
 ## Relationship to Active Queue Management {#low-latency}
 
 Even though low queueing delay is not an objective, it is not precluded either.
-Active queue management is used to enforce short queueing delays
+Active queue management (AQM) is used to enforce short queueing delays
 {{?AQM=RFC7567}}, but that leads to occasional starvation of the bottleneck
 queue, and hence to underutilization of the link, especially on paths where the
 available bandwidth changes rapidly. ABBA provides the needed mitigation.
 
 Being clocked by acknowledgements, an ABBA sender follows the rate the
-bottleneck is delivering. Where the bandwidth falls, the delay the queue imposes
-rises, and the bottleneck signals congestion. In response, the sender yields
-immediately. Where the round-trip time stays flat or falls, the sender raises
-its window quickly and takes up whatever is there. Where the available bandwidth
-varies continually, as on a radio path, the sender's rate therefore follows the
-fluctuation, while the queueing delay stays near the target the bottleneck
-signals at.
+bottleneck is delivering. Where bandwidth falls, the ACK clock slows the
+sender, and congestion signalled by the AQM through packet loss or ECN-CE
+causes the sender to reduce its window. These responses allow the AQM to
+control queueing delay. Where bandwidth becomes available and the round-trip
+time observations permit it, ABBA accelerates window growth to acquire it.
+
+ABBA thus preserves the congestion responses through which the AQM keeps queues
+short, while mitigating the underutilization that can follow a window
+reduction or an increase in available bandwidth.
 
 
 # Conventions and Definitions
@@ -402,7 +404,6 @@ CUBIC's reduction and discards the model.
 Consequently, the convergence and fairness properties of ABBA resemble those of
 CUBIC ({{Section 5.6 of !CUBIC}}), subject to the effects of acceleration
 described above.
-
 
 ## Yielding under Sustained Congestion {#yield}
 
