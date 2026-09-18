@@ -8,12 +8,12 @@
 <meta content="奥 一穂 (Kazuho Oku)" name="author">
 <meta content="
        This document specifies ABBA, an extension to CUBIC congestion control for paths
-whose available bandwidth changes rapidly during a connection. ABBA models the
-round-trip time of the path as a function of the congestion window. A round-trip
-time below what that model predicts indicates an increase in the bandwidth
-available at the bottleneck, and ABBA then permits window growth faster than
-CUBIC would, in proportion to the discrepancy. No congestion signal is
-suppressed: every loss and every ECN-CE mark produces the reduction CUBIC
+whose available bandwidth changes rapidly during a connection. ABBA tracks the
+relationship between the congestion window and the round-trip time of the path.
+A round-trip time below what that relationship implies indicates an increase in
+the bandwidth available at the bottleneck, and ABBA then permits window growth
+faster than CUBIC would, in proportion to the discrepancy. No congestion signal
+is suppressed: every loss and every ECN-CE mark produces the reduction CUBIC
 specifies. 
     " name="description">
 <meta content="xml2rfc 3.34.0" name="generator">
@@ -1052,7 +1052,7 @@ svg {
 </tr></thead>
 <tfoot><tr>
 <td class="left">Oku</td>
-<td class="center">Expires 21 March 2027</td>
+<td class="center">Expires 22 March 2027</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1065,12 +1065,12 @@ svg {
 <dd class="internet-draft">draft-kazuho-ccwg-abba-latest</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-09-17" class="published">17 September 2026</time>
+<time datetime="2026-09-18" class="published">18 September 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Standards Track</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2027-03-21">21 March 2027</time></dd>
+<dd class="expires"><time datetime="2027-03-22">22 March 2027</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
@@ -1085,12 +1085,12 @@ svg {
 <section id="section-abstract">
       <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
 <p id="section-abstract-1">This document specifies ABBA, an extension to CUBIC congestion control for paths
-whose available bandwidth changes rapidly during a connection. ABBA models the
-round-trip time of the path as a function of the congestion window. A round-trip
-time below what that model predicts indicates an increase in the bandwidth
-available at the bottleneck, and ABBA then permits window growth faster than
-CUBIC would, in proportion to the discrepancy. No congestion signal is
-suppressed: every loss and every ECN-CE mark produces the reduction CUBIC
+whose available bandwidth changes rapidly during a connection. ABBA tracks the
+relationship between the congestion window and the round-trip time of the path.
+A round-trip time below what that relationship implies indicates an increase in
+the bandwidth available at the bottleneck, and ABBA then permits window growth
+faster than CUBIC would, in proportion to the discrepancy. No congestion signal
+is suppressed: every loss and every ECN-CE mark produces the reduction CUBIC
 specifies.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
 <section class="note rfcEditorRemove" id="section-note.1">
@@ -1123,7 +1123,7 @@ specifies.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 21 March 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 22 March 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1360,13 +1360,12 @@ described in BCP 14 <span>[<a href="#RFC2119" class="cite xref">RFC2119</a>]</s
 appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶</a></p>
 <p id="section-2-2">This document uses the notation of <span>[<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>, in which window sizes are
 expressed in segments of the SMSS.<a href="#section-2-2" class="pilcrow">¶</a></p>
-<p id="section-2-3">It also uses min_rtt, the lowest round-trip time observed over the lifetime of
-the connection, and latest_rtt as maintained by the transport. beta_cubic is as
-defined in <span>[<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>, beta is beta_cubic or, where the congestion event was
-signalled by an ECN-CE mark and the sender reduces by a different factor after
-such a mark (<span>[<a href="#ABE" class="cite xref">ABE</a>]</span>), that factor; and cwnd_cubic denotes the
-congestion window that CUBIC's congestion avoidance sets on an acknowledgement,
-whichever of its regions applies (<span><a href="https://rfc-editor.org/rfc/rfc9438#section-4.3" class="relref">Section 4.3</a> of [<a href="#CUBIC" class="cite xref">CUBIC</a>]</span> through <span><a href="https://rfc-editor.org/rfc/rfc9438#section-4.5" class="relref">Section 4.5</a> of [<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>).<a href="#section-2-3" class="pilcrow">¶</a></p>
+<p id="section-2-3">It also uses latest_rtt as maintained by the transport. beta_cubic is as defined
+in <span>[<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>, beta is beta_cubic or, where the congestion event was signalled
+by an ECN-CE mark and the sender reduces by a different factor after such a mark
+(<span>[<a href="#ABE" class="cite xref">ABE</a>]</span>), that factor; and cwnd_cubic denotes the congestion window
+that CUBIC's congestion avoidance sets on an acknowledgement, whichever of its
+regions applies (<span><a href="https://rfc-editor.org/rfc/rfc9438#section-4.3" class="relref">Section 4.3</a> of [<a href="#CUBIC" class="cite xref">CUBIC</a>]</span> through <span><a href="https://rfc-editor.org/rfc/rfc9438#section-4.5" class="relref">Section 4.5</a> of [<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>).<a href="#section-2-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="overview">
@@ -1374,15 +1373,15 @@ whichever of its regions applies (<span><a href="https://rfc-editor.org/rfc/rfc9
       <h2 id="name-overview">
 <a href="#section-3" class="section-number selfRef">3. </a><a href="#name-overview" class="section-name selfRef">Overview</a>
       </h2>
-<p id="section-3-1">ABBA models the round-trip time of the path as a function of the congestion
-window, and accelerates the increase of that window while the path delivers
-better than the model predicts.<a href="#section-3-1" class="pilcrow">¶</a></p>
-<p id="section-3-2">A round-trip time below what the model predicts means the path is no longer the
-one the model was fitted to. Bandwidth may have been added, competing traffic
-may have departed, or the window may have been reduced by a loss that was not
-congestion. In each case the sender holds a window the path now carries with
-less queueing than the model expects, and ABBA increases the window faster than
-CUBIC alone would, by an amount taken from that discrepancy.<a href="#section-3-2" class="pilcrow">¶</a></p>
+<p id="section-3-1">ABBA tracks the relationship between the congestion window and the round-trip
+time of the path, and accelerates the increase of that window while the path
+delivers better than the relationship implies.<a href="#section-3-1" class="pilcrow">¶</a></p>
+<p id="section-3-2">A round-trip time below what that relationship implies means the path is no
+longer the one it was measured on. Bandwidth may have been added, competing
+traffic may have departed, or the window may have been reduced by a loss that
+was not congestion. In each case the sender holds a window the path now carries
+with less queueing than the relationship allows for, and ABBA increases the
+window faster than CUBIC alone would, by an amount taken from that discrepancy.<a href="#section-3-2" class="pilcrow">¶</a></p>
 <p id="section-3-3">Two points too close in round-trip time do not define a slope, and the model is
 left flat until the path has shown more variation than that. Once the window has
 grown well past the one that signalled congestion, the fitted line is left
@@ -1390,35 +1389,23 @@ behind for a simpler assumption: that the queue is occupied now, so round-trip
 time should rise with the window from here on, faster still where competing
 traffic is holding part of the queue. Where it does not rise, the path is
 underutilized, and the sender accelerates until the round-trip time does.<a href="#section-3-3" class="pilcrow">¶</a></p>
-<p id="section-3-4">A further condition covers the round-trip time returning to the lowest the
-connection has seen. Where congestion was signalled well above that floor, the
-sender accelerates toward a window whose round-trip time would exceed the floor
-by a small fixed margin.<a href="#section-3-4" class="pilcrow">¶</a></p>
-<p id="section-3-5">Neither candidate replaces CUBIC's own increase. The greater of the accelerated
-window and the window CUBIC sets applies, so acceleration can only raise the
-window: once the round-trip time rises to what the model predicts, the window
-holds until CUBIC's curve catches up and CUBIC resumes control of the increase.
-Every congestion signal produces the reduction CUBIC specifies.<a href="#section-3-5" class="pilcrow">¶</a></p>
-<p id="section-3-6">The sections below use four constants:<a href="#section-3-6" class="pilcrow">¶</a></p>
+<p id="section-3-4">Acceleration does not replace CUBIC's own increase. The greater of the
+accelerated window and the window CUBIC sets applies, so acceleration can only
+raise the window: once the round-trip time rises to what the model predicts, the
+window holds until CUBIC's curve catches up and CUBIC resumes control of the
+increase. Every congestion signal produces the reduction CUBIC specifies.<a href="#section-3-4" class="pilcrow">¶</a></p>
+<p id="section-3-5">The sections below use two constants:<a href="#section-3-5" class="pilcrow">¶</a></p>
 <ul class="normal">
-<li class="normal" id="section-3-7.1">
-          <p id="section-3-7.1.1">RTT_SPAN_THRESH, 5ms, the range of round-trip time the path must have
-demonstrated before either form of acceleration becomes available;<a href="#section-3-7.1.1" class="pilcrow">¶</a></p>
+<li class="normal" id="section-3-6.1">
+          <p id="section-3-6.1.1">RTT_SPAN_THRESH, 5ms, the range of round-trip time the path must have
+demonstrated before acceleration becomes available;<a href="#section-3-6.1.1" class="pilcrow">¶</a></p>
 </li>
-        <li class="normal" id="section-3-7.2">
-          <p id="section-3-7.2.1">RTT_SHORTFALL_THRESH, 2ms, how far the round-trip time must fall below a
-predicted one before that prediction is acted upon;<a href="#section-3-7.2.1" class="pilcrow">¶</a></p>
-</li>
-        <li class="normal" id="section-3-7.3">
-          <p id="section-3-7.3.1">MIN_QUEUEING, 2ms, the queueing above the minimum round-trip time below which
-the increase is accelerated separately;<a href="#section-3-7.3.1" class="pilcrow">¶</a></p>
-</li>
-        <li class="normal" id="section-3-7.4">
-          <p id="section-3-7.4.1">MAX_MIN_GAIN, 0.1, the most min_gain may reach.<a href="#section-3-7.4.1" class="pilcrow">¶</a></p>
+        <li class="normal" id="section-3-6.2">
+          <p id="section-3-6.2.1">MAX_SLOPE_RATIO, 2/3, the share of the fitted slope the model keeps.<a href="#section-3-6.2.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
-<p id="section-3-8">They also use rtt_floor(), a function that returns the lowest round-trip time
-observed over the last round trip.<a href="#section-3-8" class="pilcrow">¶</a></p>
+<p id="section-3-7">They also use rtt_floor(), a function that returns the lowest round-trip time
+observed over the last round trip.<a href="#section-3-7" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="model">
@@ -1504,6 +1491,7 @@ fit():
   else:
     a = min((high_rtt - low_rtt) / (high_cwnd - low_cwnd),
             low_rtt / low_cwnd)     # capped at the line through the origin
+    a = a * MAX_SLOPE_RATIO         # then flattened about the low point
     b = low_rtt - a * low_cwnd
 </pre><a href="#section-4.3-2" class="pilcrow">¶</a>
 </div>
@@ -1511,10 +1499,14 @@ fit():
 would leave no span to fit across. The previous model is kept in that case:
 drawing a line through the new point would absorb the very decline in round-trip
 time that the model exists to detect.<a href="#section-4.3-3" class="pilcrow">¶</a></p>
-<p id="section-4.3-4">The slope is capped at the line through the low point and the origin, which
-keeps the intercept from going negative. On that line the window is the
-bandwidth multiplied by the round-trip time; a steeper one would put the window
-above what the path delivers in a round trip.<a href="#section-4.3-4" class="pilcrow">¶</a></p>
+<p id="section-4.3-4">The slope is capped at the line through the low point and the origin. On that
+line the window is the bandwidth multiplied by the round-trip time; a steeper
+one would put the window above what the path delivers in a round trip.<a href="#section-4.3-4" class="pilcrow">¶</a></p>
+<p id="section-4.3-5">It is then flattened to MAX_SLOPE_RATIO of itself, the line rotating about the
+low point. The slope is the reciprocal of the bandwidth, so two thirds of it
+stands for a bandwidth one and a half times as large: the model predicts as
+though that increase had already occurred, and <a href="#increase" class="auto internal xref">Section 5</a> accelerates only
+where the path does better still.<a href="#section-4.3-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="extrapolate">
@@ -1574,40 +1566,25 @@ line.<a href="#section-4.4-4" class="pilcrow">¶</a></p>
 <p id="section-5-3">the congestion window is adjusted on each acknowledgement as follows.<a href="#section-5-3" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-5-4">
 <pre>
-model_gain = 0
-if a &gt; 0 and a * cwnd + b - latest_rtt &gt;= RTT_SHORTFALL_THRESH:
-  w_ref      = (latest_rtt - b) / a
-  model_gain = (1 - w_ref / cwnd) / 2
+accel = 0
+if a &gt; 0 and latest_rtt &lt; a * cwnd + b:
+  w_ref = (latest_rtt - b) / a
+  gain  = 2 / 3 * (1 - w_ref / cwnd)
+  accel = min(segments_acked * gain, cwnd / 2)
 
-min_gain = 0
-if high_rtt - min_rtt &gt;= RTT_SPAN_THRESH and
-   latest_rtt &lt; min_rtt + MIN_QUEUEING:
-  min_gain = min((min_rtt + MIN_QUEUEING) / latest_rtt - 1, MAX_MIN_GAIN)
-
-gain = max(model_gain, min_gain)
-
-increase = min(segments_acked * gain, cwnd / 2)
-
-cwnd = max(cwnd + increase, cwnd_cubic)
+cwnd = max(cwnd + accel, cwnd_cubic)
 </pre><a href="#section-5-4" class="pilcrow">¶</a>
 </div>
-<p id="section-5-5">segments_acked is the number of segments the acknowledgement newly
-acknowledged.<a href="#section-5-5" class="pilcrow">¶</a></p>
-<p id="section-5-6">model_gain measures how far the path has moved from the one the model was fitted
-to. If the round-trip time the model predicts is no less than latest_rtt +
-RTT_SHORTFALL_THRESH, the path has room the window is not using, and half of
-that room is taken each round trip.<a href="#section-5-6" class="pilcrow">¶</a></p>
-<p id="section-5-7">min_gain covers the case the model cannot describe, the round-trip time having
-returned to the floor of the connection rather than merely fallen below a fitted
-line. If latest_rtt is below min_rtt + MIN_QUEUEING, the queue has all but
-drained, and the window is raised toward the one that would restore it.
-Requiring high_rtt to exceed min_rtt by RTT_SPAN_THRESH keeps min_gain out of
-paths whose queue never showed enough depth for the floor to mean anything.<a href="#section-5-7" class="pilcrow">¶</a></p>
-<p id="section-5-8">The greater of the two gains is adopted, and the increase it yields is capped at
-half the window per acknowledgement. The result competes with what CUBIC would
-have set from the same window, so acceleration can raise the congestion window
-but never lower it. Once neither gain applies, the window holds, and once
-CUBIC's curve catches up, the increase is handled by CUBIC.<a href="#section-5-8" class="pilcrow">¶</a></p>
+<p id="section-5-5">segments_acked is the number of segments the acknowledgement newly acknowledged.<a href="#section-5-5" class="pilcrow">¶</a></p>
+<p id="section-5-6">The gain measures how far the path has moved from the one the model was measured
+on. Where the round-trip time falls below what the model predicts for the window
+in hand, the path has room the window is not using, and two thirds of that room
+is taken each round trip.<a href="#section-5-6" class="pilcrow">¶</a></p>
+<p id="section-5-7">The increase is capped at half the window per acknowledgement. The result
+competes with what CUBIC would have set from the same window, so acceleration
+can raise the congestion window but never lower it. Once the gain no longer applies, the
+window holds, and once CUBIC's curve catches up, the increase is handled by
+CUBIC.<a href="#section-5-7" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="properties">
@@ -1651,18 +1628,30 @@ described above.<a href="#section-6.1-5" class="pilcrow">¶</a></p>
 ECN-CE mark produces the reduction the underlying controller specifies.<a href="#section-6.2-1" class="pilcrow">¶</a></p>
 <p id="section-6.2-2">Under sustained congestion a signal arrives every round trip, so the increase
 taken in the round trip that follows a reduction must not surpass that
-reduction. Neither of the two accelerated gains does.<a href="#section-6.2-2" class="pilcrow">¶</a></p>
-<p id="section-6.2-3">model_gain is bounded by the halving in its own definition. In one round trip,
-CUBIC never grows the window more than one and a half times (<span><a href="https://rfc-editor.org/rfc/rfc9438#section-4.2" class="relref">Section 4.2</a> of [<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>), and ABBA cannot exceed that either, the halving holding model_gain
-below 1/2. Relative to the round-trip time, the discrepancy becomes the largest
-when it stays at the low point; any acknowledgement carrying a lower one moves
-the low point of the model and resets the discrepancy. At those extremes the
-line, passing through the low point, places w_ref at low_cwnd, and one round
-trip after exiting recovery model_gain is (1 - 2/3) / 2, a sixth. As that is
-below 1 / beta_ecn - 1, the model-based gain never surpasses the reduction in
-one round trip time.<a href="#section-6.2-3" class="pilcrow">¶</a></p>
-<p id="section-6.2-4">min_gain is held to MAX_MIN_GAIN in its own right, a tenth, which is likewise
-below 1 / beta_ecn - 1.<a href="#section-6.2-4" class="pilcrow">¶</a></p>
+reduction.<a href="#section-6.2-2" class="pilcrow">¶</a></p>
+<p id="section-6.2-3">The gain is bounded by how far the window has run past the low point. In one
+round trip, CUBIC never grows the window more than one and a half times
+(<span><a href="https://rfc-editor.org/rfc/rfc9438#section-4.2" class="relref">Section 4.2</a> of [<a href="#CUBIC" class="cite xref">CUBIC</a>]</span>), and ABBA cannot exceed that either. Relative to the
+round-trip time, the discrepancy becomes the largest when it stays at the low
+point; any acknowledgement carrying a lower one moves the low point of the model
+and resets the discrepancy. At those extremes the line, passing through the low
+point, places w_ref at low_cwnd, and one round trip after exiting recovery the
+gain is 2/3 * (1 - 2/3), two ninths.<a href="#section-6.2-3" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-6.2-4">
+<pre>
+TODO: this no longer holds for beta_ecn. The requirement is that the
+increase in one round trip not surpass the reduction, that is
+gain &lt; 1 / beta - 1:
+
+  beta_cubic 0.7  -&gt; threshold 0.4286, (1 + 2/9) * 0.7  = 0.856  ok
+  beta_ecn   0.85 -&gt; threshold 0.1765, (1 + 2/9) * 0.85 = 1.039  fails
+
+At a gain of two thirds of the gap, the worst case is 2/9 = 0.222,
+above the 0.1765 that beta_ecn admits. It held at 1/6 when the gain
+was half the gap. Either the multiplier comes down, or the claim is
+scoped to loss-signalled reductions.
+</pre><a href="#section-6.2-4" class="pilcrow">¶</a>
+</div>
 </section>
 </div>
 </section>
