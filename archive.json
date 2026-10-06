@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2026-10-04T05:10:17.906883+00:00",
+  "timestamp": "2026-10-06T05:42:34.605480+00:00",
   "repo": "kazuho/draft-kazuho-ccwg-abba",
   "labels": [
     {
@@ -54,6 +54,23 @@
       "color": "ffffff"
     }
   ],
-  "issues": [],
+  "issues": [
+    {
+      "number": 1,
+      "id": "I_kwDOUP3uys8AAAABVF1pzg",
+      "title": "support prague / l4s congestion response",
+      "url": "https://github.com/kazuho/draft-kazuho-ccwg-abba/issues/1",
+      "state": "OPEN",
+      "author": "kazuho",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "ABBA currently assumes that each congestion event reduces the congestion window by a fixed multiplicative factor beta. The same machinery can be applied to Prague/L4S with relatively little change.\n\nWhen queue buildup is not visible, ABBA accelerates the increase once:\n\n```c\ncwnd > cwnd_prior * (2 - beta)\n```\n\nPrague reduces the congestion window on CE feedback using approximately:\n\n```c\nbeta = 1 - alpha / 2\n```\n\nwhere alpha is Prague's EWMA estimate of the CE-marked fraction.\n\nBy simply recording the effective beta used for each congestion-window reduction, ABBA can use that recorded value for the following congestion epoch. The existing ABBA rules, including the acceleration threshold above, can then be applied unchanged.\n\nPrague uses a CUBIC arm on a per-period basis, as in Apple's implementation. That arm can use the existing ABBA behavior unchanged.\n\nPrague's existing adaptation of alpha can also remain unchanged. If ABBA accelerates too aggressively and causes a higher CE-marking fraction, Prague will naturally increase alpha, resulting in a stronger subsequent reduction. Therefore, no ABBA-specific adjustment of alpha appears necessary.",
+      "createdAt": "2026-10-05T10:27:39Z",
+      "updatedAt": "2026-10-05T10:27:39Z",
+      "closedAt": null,
+      "comments": []
+    }
+  ],
   "pulls": []
 }
