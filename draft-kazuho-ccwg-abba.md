@@ -352,7 +352,7 @@ if a > 0 and latest_rtt < a * cwnd + b:
   gain  = 1 / (1 + MAX_SLOPE_RATIO) * (1 - w_ref / cwnd)
   if cwnd < cwnd_prior / beta:
     gain = min(gain, pow(beta, -2 / 3) - 1)
-  accel = min(segments_acked * gain, cwnd / 2)
+  accel = min(segments_acked * gain, segments_acked / 2)
 
 cwnd = max(cwnd + accel, cwnd_cubic)
 ~~~
@@ -374,11 +374,13 @@ Below cwnd_prior / beta the gain is capped, so that the window grows over a
 round trip by no more than pow(beta, -2/3). {{yield}} shows what that bound is
 for.
 
-The increase is capped at half the window per acknowledgement. The result
-competes with what CUBIC would have set from the same window, so acceleration
-can raise the congestion window but never lower it. Once the gain no longer
-applies, the window holds, and once CUBIC's curve catches up, the increase is
-handled by CUBIC.
+The increase is capped at half the segments acknowledged, so that the window
+grows over a round trip by no more than one and a half times, the bound CUBIC
+applies to its own increase ({{Section 4.4 of !CUBIC}} and {{Section 4.5 of
+!CUBIC}}). The result competes with what CUBIC would have set from the same
+window, so acceleration can raise the congestion window but never lower it. Once
+the gain no longer applies, the window holds, and once CUBIC's curve catches up,
+the increase is handled by CUBIC.
 
 
 # Properties
