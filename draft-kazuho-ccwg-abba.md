@@ -83,8 +83,9 @@ competing flows that take their losses asynchronously.
 
 ABBA approximates that relationship with a line through two points, both
 observed within one period between congestion events: the window and round-trip
-time on entering recovery, where the queue is at its fullest, and those at the
-lowest round-trip time observed afterwards, where it is at its emptiest. Where a
+time on entering recovery, where the queue is at its fullest, and the window on
+leaving recovery, where it is at its emptiest, paired with the lowest round-trip
+time observed afterwards. Where a
 later observation falls below that line, the window is no longer producing the
 queueing it did, which is to say the bandwidth of the bottleneck has increased.
 ABBA then accelerates the increase of the window in proportion to that
@@ -219,8 +220,8 @@ observed over the last round trip.
 The model is a line through two points, both observed within one period between
 congestion events: the high point, the window and round-trip time at the
 congestion event that began the period, where the queue was built up; and the
-low point, the lowest round-trip time observed since, where it was at its
-emptiest. The line between them says what round-trip time a window in that range
+low point, the window at the end of recovery, where the queue was at its
+emptiest, paired with the lowest round-trip time observed since. The line between them says what round-trip time a window in that range
 should produce.
 
 An ABBA sender therefore holds the following in addition to the state of CUBIC:
@@ -254,12 +255,16 @@ are not admitted.
 ## The Low Point {#low}
 
 The low point is initialized when the recovery period ends, at the congestion
-window then in hand and at high_rtt. Thereafter, whenever an acknowledgement in
-congestion avoidance carries a round-trip time at least 1ms below low_rtt, the
-point moves to that sample and to the window that accompanied it. The model is
-fitted afresh on initialization and on every move. The 1ms threshold keeps
-jitter from moving the point once the queue has drained and the round-trip time
-no longer varies with the window.
+window then in hand and at high_rtt. low_cwnd remains at that window. Until the
+model is redrawn from the origin ({{extrapolate}}), low_rtt takes the round-trip
+time of any acknowledgement in congestion avoidance that falls below it, and the
+model is fitted afresh on initialization and on every such update.
+
+The window on leaving recovery is the smallest of the period, and the queue it
+produces the shortest. Under the model, later samples, being taken at larger
+windows, fall below the round-trip time recorded there only where that
+observation was inflated by jitter; the lowest of them is therefore the better
+estimate of the round-trip time at low_cwnd.
 
 By taking high_rtt initially as the low point's round-trip time, the model
 starts flat and remains so until the path shows a round-trip time
@@ -268,15 +273,12 @@ RTT_SPAN_THRESH below it.
 ## Fitting the Line {#fit}
 
 Whenever the low point is set or moves, the line is reevaluated from the two
-points then in hand. Where those points do not support a line, either because
-the low point has reached or passed the high one or because their round-trip
-times lie within RTT_SPAN_THRESH of each other, the previous model is kept or a
-flat one is left in its place.
+points then in hand. Where their round-trip times lie within RTT_SPAN_THRESH of
+each other, the points do not support a line, and a flat model is left in its
+place.
 
 ~~~
 fit():
-  if high_cwnd <= low_cwnd:
-    return                          # keep the previous model
   if high_rtt - low_rtt < RTT_SPAN_THRESH:
     a = 0                           # flat: no prediction to invert
     b = low_rtt
@@ -286,11 +288,6 @@ fit():
     a = a * MAX_SLOPE_RATIO         # then flattened about the low point
     b = low_rtt - a * low_cwnd
 ~~~
-
-A lower round-trip time can arrive at a window at or beyond high_cwnd, which
-would leave no span to fit across. The previous model is kept in that case:
-drawing a line through the new point would absorb the very decline in round-trip
-time that the model exists to detect.
 
 The slope is capped at the line through the low point and the origin. On that
 line the window is the bandwidth multiplied by the round-trip time; a steeper
@@ -333,6 +330,12 @@ if b != 0 and cwnd > high_cwnd * (2 - beta):
 
 The sender therefore goes on accelerating until the queue builds to meet the
 line.
+
+From then on the low point plays no part, and it is no longer moved. Refitting
+through it would bring back the line just left behind and apply it far outside
+the range it was observed over, so that a lower round-trip time, which is
+evidence of room on the path, could lower the prediction being pursued and
+weaken the acceleration.
 
 
 # Accelerated Increase {#increase}
