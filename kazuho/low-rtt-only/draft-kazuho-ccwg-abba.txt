@@ -1,0 +1,610 @@
+
+
+
+
+Congestion Control Working Group                        奥 一穂 (K. Oku)
+Internet-Draft                                                    Fastly
+Intended status: Standards Track                        20 November 2026
+Expires: 24 May 2027
+
+
+           Accelerated Bottleneck Bandwidth Adaptation (ABBA)
+                     draft-kazuho-ccwg-abba-latest
+
+Abstract
+
+   This document specifies ABBA, an extension to CUBIC congestion
+   control for paths whose available bandwidth changes rapidly during a
+   connection.  ABBA tracks the relationship between the congestion
+   window and the round-trip time of the path.  A round-trip time below
+   what that relationship implies indicates an increase in the bandwidth
+   available at the bottleneck, and ABBA then permits window growth
+   faster than CUBIC would, in proportion to the discrepancy.  No
+   congestion signal is suppressed: every loss and every ECN-CE mark
+   produces the reduction CUBIC specifies.
+
+Discussion Venues
+
+   This note is to be removed before publishing as an RFC.
+
+   Discussion of this document takes place on the Congestion Control
+   Working Group Working Group mailing list (ccwg@ietf.org), which is
+   archived at https://mailarchive.ietf.org/arch/browse/ccwg/.
+
+   Source for this draft and an issue tracker can be found at
+   https://github.com/kazuho/draft-kazuho-ccwg-abba.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 24 May 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction
+     1.1.  Optimizing for Object Delivery
+     1.2.  Relationship to Active Queue Management
+   2.  Conventions and Definitions
+   3.  Overview
+   4.  The Round-Trip Time Model
+     4.1.  The High Point
+     4.2.  The Low Point
+     4.3.  Fitting the Line
+     4.4.  Beyond the Observed Range
+   5.  Accelerated Increase
+   6.  Properties
+     6.1.  Convergence and Fairness
+     6.2.  Yielding under Sustained Congestion
+   7.  Security Considerations
+   8.  IANA Considerations
+   9.  References
+     9.1.  Normative References
+     9.2.  Informative References
+   Acknowledgments
+   Author's Address
+
+1.  Introduction
+
+   CUBIC [CUBIC] attains the bottleneck bandwidth by way of a standing
+   queue.  Slow start overshoots the capacity of the path and builds
+   that queue; thereafter the ACK clock paces the sender at the rate the
+   bottleneck delivers, and the queue keeps the bottleneck busy across
+   the round-trip so that the link does not idle.  Congestion avoidance
+   then raises the congestion window gradually, the more gradually the
+   larger the window, which is what lets competing flows converge on
+   their shares.  It lowers the window when congestion is signalled.
+   The design rests on two premises: that loss indicates congestion, and
+   that the capacity of the path is stable.
+
+   Radio paths satisfy neither premise.  Available bandwidth varies
+   continually as radio quality changes with distance, obstruction, and
+   interference.  Handover between base stations or between satellites
+   shifts it abruptly.  Packets are dropped in bursts rather than at
+   random: at the moment of a handover, when the link layer gives up
+   retransmitting, and when the buffer can no longer hold the queue.
+   Only the last of these is congestion.
+
+   CUBIC reacts to this in three ways:
+
+   *  It reduces the congestion window when loss is observed.  Doing so
+      is safe, because the loss could be due to congestion.
+
+   *  It sends a packet when an acknowledgement is received.  A slowdown
+      of the path therefore slows the sender of its own accord, and a
+      speedup raises it in the same way, for as long as the sender keeps
+      the bottleneck queue from emptying.
+
+   *  It increases the congestion window only slowly.  Once the queue
+      has emptied, only an increase of the window can raise the sending
+      rate, and the larger the bandwidth-delay product, the longer that
+      takes.  Where the available bandwidth increases faster than that,
+      the sender does not fully utilize it.
+
+   This document specifies ABBA, which addresses the last of the three.
+   While the bottleneck queue is occupied and the sender is limited by
+   its congestion window, round-trip time rises linearly with the
+   congestion window: the slope is the reciprocal of the bottleneck
+   bandwidth, and the intercept is the queue held by competing flows
+   that take their losses asynchronously.
+
+   ABBA approximates that relationship with a line through two points,
+   both observed within one period between congestion events: the window
+   and round-trip time on entering recovery, where the queue is at its
+   fullest, and the window on leaving recovery, where it is at its
+   emptiest, paired with the lowest round-trip time observed afterwards.
+   Where a later observation falls below that line, the window is no
+   longer producing the queueing it did, which is to say the bandwidth
+   of the bottleneck has increased.  ABBA then accelerates the increase
+   of the window in proportion to that discrepancy.
+
+   ABBA does not suppress or defer any congestion response: every lost
+   packet and every ECN-CE mark [ECN] produces the reduction CUBIC
+   specifies.  The model is moreover discarded at every congestion
+   event, and what the window gains while a congestion signal is in
+   flight never surpasses what the reduction takes back.  A sender
+   meeting congestion therefore comes away below the window that
+   provoked it.
+
+   The following subsections set out the objective ABBA is aimed at —
+   the delivery time of an object — and how it relates to mechanisms
+   that pursue low queueing delay.
+
+1.1.  Optimizing for Object Delivery
+
+   A finite transfer benefits from available bandwidth only while it has
+   data left to send.  Time spent acquiring that bandwidth can therefore
+   account for a substantial part of its completion time, even if the
+   congestion controller would eventually reach the same steady-state
+   rate.
+
+   Together with Rapid Start [I-D.kazuho-ccwg-rapid-start] and Cuback
+   [CUBACK], ABBA addresses different parts of this acquisition.  Rapid
+   Start accelerates the initial expansion of the congestion window and
+   controls the transition into congestion avoidance.  Cuback governs
+   subsequent growth, including convergence when a flow competes with
+   traffic already occupying the bottleneck.  Because its clock is
+   derived from acknowledgements, a flow that is gaining share traverses
+   CUBIC's curve faster than elapsed time would carry it, so a newcomer
+   reaches its share sooner than under CUBIC, without the bottleneck
+   queue having to drain.
+
+   ABBA complements these mechanisms when the congestion window becomes
+   insufficient to use the available bandwidth.  This can occur after an
+   increase in capacity, the departure of competing traffic, or a window
+   reduction in response to non-congestive loss.  Where the round-trip
+   time observations permit it, ABBA accelerates growth beyond that of
+   the underlying congestion-avoidance algorithm.
+
+   Drops on such paths are commonly reported as a packet loss ratio, but
+   they do not occur at random: they arrive in the bursts described
+   above, and a burst is more or less a single congestion event rather
+   than a series of them.  The congestion events they trigger are
+   therefore far rarer than the ratio suggests under a random loss
+   model.  What matters more to delivery time than recovering from those
+   events is adapting to the bandwidth that becomes available between
+   them.  When a succession of recoveries hides the relationship between
+   round-trip time and congestion window, ABBA still accelerates the
+   growth of the window once it has climbed well past the one the last
+   event interrupted (Section 4.4).
+
+   Low queueing delay is not an objective of ABBA, because when the data
+   of an object is already available at the sender, withholding it to
+   keep the bottleneck queue short does not remove the wait; it changes
+   where the data waits, and increases the chance of underutilizing the
+   bottleneck.  What withholding does reduce is the pressure the sender
+   places on competing flows to yield, which would prolong bandwidth
+   acquisition and consequently object delivery.
+
+1.2.  Relationship to Active Queue Management
+
+   Even though low queueing delay is not an objective, it is not
+   precluded either.  Active queue management (AQM) is used to enforce
+   short queueing delays [AQM], but that leads to occasional starvation
+   of the bottleneck queue, and hence to underutilization of the link,
+   especially on paths where the available bandwidth changes rapidly.
+   ABBA provides the needed mitigation.
+
+   Being clocked by acknowledgements, an ABBA sender follows the rate
+   the bottleneck is delivering.  Where bandwidth falls, the ACK clock
+   slows the sender, and congestion signalled by the AQM through packet
+   loss or ECN-CE causes the sender to reduce its window.  These
+   responses allow the AQM to control queueing delay.  Where bandwidth
+   becomes available and the round-trip time observations permit it,
+   ABBA accelerates window growth to acquire it.
+
+   ABBA thus preserves the congestion responses through which the AQM
+   keeps queues short, while mitigating the underutilization that can
+   follow a window reduction or an increase in available bandwidth.
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   This document uses the notation of [CUBIC], in which window sizes are
+   expressed in segments of the SMSS.
+
+   It also uses latest_rtt as maintained by the transport. beta_cubic is
+   as defined in [CUBIC], beta is beta_cubic or, where the congestion
+   event was signalled by an ECN-CE mark and the sender reduces by a
+   different factor after such a mark ([ABE]), that factor; and
+   cwnd_cubic denotes the congestion window that CUBIC's congestion
+   avoidance sets on an acknowledgement, whichever of its regions
+   applies (Section 4.3 of [CUBIC] through Section 4.5 of [CUBIC]).
+
+3.  Overview
+
+   ABBA tracks the relationship between the congestion window and the
+   round-trip time of the path, and accelerates the increase of that
+   window while the path delivers better than the relationship implies.
+
+   A round-trip time below what that relationship implies means the path
+   is no longer the one it was measured on.  Bandwidth may have been
+   added, competing traffic may have departed, or the window may have
+   been reduced by a loss that was not congestion.  In each case the
+   sender holds a window the path now carries with less queueing than
+   the relationship allows for, and ABBA increases the window faster
+   than CUBIC alone would, by an amount taken from that discrepancy.
+
+   Two points too close in round-trip time do not define a slope, and
+   the model is left flat until the path has shown more variation than
+   that.  Once the window has grown well past the one that signalled
+   congestion, the fitted line is left behind for a simpler assumption:
+   that the queue is occupied now, so round-trip time should rise with
+   the window from here on, faster still where competing traffic is
+   holding part of the queue.  Where it does not rise, the path is
+   underutilized, and the sender accelerates until the round-trip time
+   does.
+
+   Acceleration does not replace CUBIC's own increase.  The greater of
+   the accelerated window and the window CUBIC sets applies, so
+   acceleration can only raise the window: once the round-trip time
+   rises to what the model predicts, the window holds until CUBIC's
+   curve catches up and CUBIC resumes control of the increase.  Every
+   congestion signal produces the reduction CUBIC specifies.
+
+   The sections below use two constants:
+
+   *  RTT_SPAN_THRESH, 5ms, the range of round-trip time the path must
+      have demonstrated before acceleration becomes available;
+
+   *  MAX_SLOPE_RATIO, 2/3, the share of the fitted slope the model
+      keeps.
+
+   They also use rtt_floor(), a function that returns the lowest round-
+   trip time observed over the last round trip.
+
+4.  The Round-Trip Time Model
+
+   The model is a line through two points, both observed within one
+   period between congestion events: the high point, the window and
+   round-trip time at the congestion event that began the period, where
+   the queue was built up; and the low point, the window at the end of
+   recovery, where the queue was at its emptiest, paired with the lowest
+   round-trip time observed since.  The line between them says what
+   round-trip time a window in that range should produce.
+
+   An ABBA sender therefore holds the following in addition to the state
+   of CUBIC:
+
+   *  high_cwnd and high_rtt, the high point (Section 4.1);
+
+   *  low_cwnd and low_rtt, the low point (Section 4.2);
+
+   *  a and b, the coefficients of the line, unset until a fit succeeds
+      (Section 4.3).
+
+   All are established anew at each congestion event, and where such an
+   event is later determined to have been spurious (Section 4.9 of
+   [CUBIC]), they are restored to the values they held before.
+
+4.1.  The High Point
+
+   At the congestion event that begins a period, the sender records the
+   congestion window before the reduction as high_cwnd.  The round-trip
+   time recorded with it depends on the signal: where the event was
+   signalled by a packet loss, high_rtt is the lowest round-trip time
+   observed from the event through the end of the recovery period; where
+   it was signalled by an ECN-CE mark, high_rtt is rtt_floor(), the
+   lowest observed over the round trip preceding the mark.
+
+   The two signals place the observation differently.  A loss is
+   detected a round trip after the packet was sent; senders go on
+   transmitting until then, so the queue remains full as their recovery
+   periods open.  Samples taken during recovery therefore still describe
+   a full queue, and the lowest of them is the conservative estimate of
+   what a full queue costs.  An ECN-CE mark instead reports a queue that
+   was already persistently occupied (Section 5.1 of [ECN]), so the
+   observation to keep is the one from before the mark, and samples
+   taken after it are not admitted.
+
+4.2.  The Low Point
+
+   The low point is initialized when the recovery period ends, at the
+   congestion window then in hand and at high_rtt. low_cwnd remains at
+   that window.  Until the model is redrawn from the origin
+   (Section 4.4), low_rtt takes the round-trip time of any
+   acknowledgement in congestion avoidance that falls below it, and the
+   model is fitted afresh on initialization and on every such update.
+
+   The window on leaving recovery is the smallest of the period, and the
+   queue it produces the shortest.  Under the model, later samples,
+   being taken at larger windows, fall below the round-trip time
+   recorded there only where that observation was inflated by jitter;
+   the lowest of them is therefore the better estimate of the round-trip
+   time at low_cwnd.
+
+   By taking high_rtt initially as the low point's round-trip time, the
+   model starts flat and remains so until the path shows a round-trip
+   time RTT_SPAN_THRESH below it.
+
+4.3.  Fitting the Line
+
+   Whenever the low point is set or moves, the line is reevaluated from
+   the two points then in hand.  Where their round-trip times lie within
+   RTT_SPAN_THRESH of each other, the points do not support a line, and
+   a flat model is left in its place.
+
+fit():
+  if high_rtt - low_rtt < RTT_SPAN_THRESH:
+    a = 0                           # flat: no prediction to invert
+    b = low_rtt
+  else:
+    a = min((high_rtt - low_rtt) / (high_cwnd - low_cwnd),
+            low_rtt / low_cwnd)     # capped at the line through the origin
+    a = a * MAX_SLOPE_RATIO         # then flattened about the low point
+    b = low_rtt - a * low_cwnd
+
+   The slope is capped at the line through the low point and the origin.
+   On that line the window is the bandwidth multiplied by the round-trip
+   time; a steeper one would put the window above what the path delivers
+   in a round trip.
+
+   It is then flattened to MAX_SLOPE_RATIO of itself, the line rotating
+   about the low point.  The slope is the reciprocal of the bandwidth,
+   so two thirds of it stands for a bandwidth one and a half times as
+   large: the model predicts as though that increase had already
+   occurred, and Section 5 accelerates only where the path does better
+   still.
+
+4.4.  Beyond the Observed Range
+
+   Growing to high_cwnd * (2 - beta), about twice the window the
+   reduction left the sender with, without congestion reappearing says
+   the path is no longer the one that signalled it: its bandwidth may
+   have risen, a competing flow may have departed, or one that held much
+   of the bandwidth may have yielded and be reclaiming it more slowly
+   than this sender is taking it.  Past high_cwnd the sender is already
+   in CUBIC's convex region, probing upward for a new maximum on the
+   same reasoning (Section 4.5 of [CUBIC]).  In each case the capacity
+   is there to be taken, and where the competitor is still present,
+   taking it is what convergence consists of.
+
+   The model is therefore redrawn as the line from the origin through
+   where the sender now stands, the current window and rtt_floor().
+   Drawing from the origin is what drops the intercept: no part of the
+   round-trip time is credited to the competing flows any longer.  Where
+   a fitted line predicted more round-trip time than that, the sender
+   has been chasing the higher value, and the line is drawn through that
+   instead.
+
+   if b != 0 and cwnd > high_cwnd * (2 - beta):
+     rtt_target = rtt_floor()
+     if b is set:
+       rtt_target = max(rtt_target, a * cwnd + b)
+
+     a = rtt_target / cwnd
+     b = 0
+
+   The sender therefore goes on accelerating until the queue builds to
+   meet the line.
+
+   From then on the low point plays no part, and it is no longer moved.
+   Refitting through it would bring back the line just left behind and
+   apply it far outside the range it was observed over, so that a lower
+   round-trip time, which is evidence of room on the path, could lower
+   the prediction being pursued and weaken the acceleration.
+
+5.  Accelerated Increase
+
+   To accelerate the increase, when all of the following conditions are
+   met:
+
+   *  the sender is in congestion avoidance,
+
+   *  the acknowledgement lies outside a recovery period,
+
+   *  the sender is limited by its congestion window,
+
+   the congestion window is adjusted on each acknowledgement as follows.
+
+   accel = 0
+   if a > 0 and latest_rtt < a * cwnd + b:
+     w_ref = (latest_rtt - b) / a
+     gain  = 1 / (1 + MAX_SLOPE_RATIO) * (1 - w_ref / cwnd)
+     if cwnd < cwnd_prior / beta:
+       gain = min(gain, pow(beta, -2 / 3) - 1)
+     accel = min(segments_acked * gain, segments_acked / 2)
+
+   cwnd = max(cwnd + accel, cwnd_cubic)
+
+   segments_acked is the number of segments the acknowledgement newly
+   acknowledged.
+
+   The gain measures how far the path has moved from the one the model
+   was measured on.  Where the round-trip time falls below what the
+   model predicts for the window in hand, the path has room the window
+   is not using.  Each round trip takes 1 / (1 + MAX_SLOPE_RATIO) of
+   that room, three fifths.
+
+   That share is what the delay in the feedback affords.  The path
+   answers a round trip later, so the gain is applied again before the
+   answer arrives, and summed over such a run it comes to no more than 1
+   / MAX_SLOPE_RATIO of the room first observed.  That is the margin the
+   flattening created, so the run carries the window no further than the
+   fitted slope would have put it.
+
+   Below cwnd_prior / beta the gain is capped, so that the window grows
+   over a round trip by no more than pow(beta, -2/3).  Section 6.2 shows
+   what that bound is for.
+
+   The increase is capped at half the segments acknowledged, so that the
+   window grows over a round trip by no more than one and a half times,
+   the bound CUBIC applies to its own increase (Section 4.4 of [CUBIC]
+   and Section 4.5 of [CUBIC]).  The result competes with what CUBIC
+   would have set from the same window, so acceleration can raise the
+   congestion window but never lower it.  Once the gain no longer
+   applies, the window holds, and once CUBIC's curve catches up, the
+   increase is handled by CUBIC.
+
+6.  Properties
+
+6.1.  Convergence and Fairness
+
+   Within the observed range, acceleration requires high_rtt to exceed
+   low_rtt by at least RTT_SPAN_THRESH.  Until that span has been
+   observed, window growth is controlled entirely by CUBIC, unless the
+   window exceeds the threshold for extrapolation (Section 4.4).
+
+   On a path whose bandwidth, idle delay, and queue capacity remain
+   stable, acceleration is expected to remain inactive when flows are
+   near convergence or when the sender is yielding share to competing
+   traffic.  Near convergence, the fitted relationship should remain
+   representative; when the sender is yielding share, competing traffic
+   increases the queueing its window encounters.  Retaining only two
+   thirds of the fitted slope leaves a margin for variation in that
+   relationship.
+
+   Whether acceleration engages is decided by the round-trip time.
+   Where it meets or exceeds the model's prediction, there is no
+   shortfall and window growth remains controlled by CUBIC.
+
+   Where the round-trip time falls below that prediction, the path is
+   carrying the window with less queueing than the model expected.  This
+   can indicate unused bandwidth or capacity released by competing
+   traffic.  Under additive increase and multiplicative decrease, flows
+   holding larger windows release more capacity when they yield, while
+   additive increase lets flows holding smaller windows catch up.  ABBA
+   accelerates that acquisition where the round-trip time observations
+   permit it, supporting the same convergence process.
+
+   Where acceleration no longer engages, the window is held where it
+   stands until CUBIC's curve catches up.  Subsequent growth is then
+   controlled by CUBIC, unless a new shortfall permits acceleration
+   again.  Every congestion event retains CUBIC's reduction and discards
+   the model.
+
+   Consequently, the convergence and fairness properties of ABBA
+   resemble those of CUBIC (Section 5.6 of [CUBIC]), subject to the
+   effects of acceleration described above.
+
+6.2.  Yielding under Sustained Congestion
+
+   Call the bar the window at which the path signals congestion.  What
+   has to hold is that the sender comes away below it.  ABBA caps the
+   gain to that end: below a window of cwnd_prior / beta, no round trip
+   grows the window by more than pow(beta, -2/3).
+
+   When congestion is signalled, the window stands at or above the bar.
+
+   With the bar below cwnd_epoch, the sender is over it from the outset,
+   so the signal is caused at once and reported a round trip later.
+   Reaching cwnd_prior would take a factor of 1 / beta, and the cap
+   allows only pow(beta, -2/3) in that round trip, so the signal is
+   reported below cwnd_prior and the epoch that follows stands at
+   pow(beta, 1/3) of the one before it.  Each such event shrinks the
+   epoch, and once it has fallen below the bar, the bar lies between it
+   and cwnd_prior: cwnd_prior is the window the signal was reported at.
+
+   With the bar between cwnd_epoch and cwnd_prior, the sender reaches
+   the bar while the cap is in force, and a round trip later, when the
+   acknowledgement reports the signal, the window stands at no more than
+
+   bar * pow(beta, -2/3)
+
+   still below cwnd_prior / beta, so the cap held throughout.  Reducing
+   by beta leaves
+
+   bar * pow(beta, 1/3)
+
+   so the sender comes away under the bar for any beta short of one.
+
+   The cap governs the accelerated gain alone.  CUBIC's own increase is
+   not touched by it, and where CUBIC sets the larger window that window
+   stands, as it would without ABBA.
+
+7.  Security Considerations
+
+   TODO Security
+
+8.  IANA Considerations
+
+   This document has no IANA actions.
+
+9.  References
+
+9.1.  Normative References
+
+   [CUBIC]    Xu, L., Ha, S., Rhee, I., Goel, V., and L. Eggert, Ed.,
+              "CUBIC for Fast and Long-Distance Networks", RFC 9438,
+              DOI 10.17487/RFC9438, August 2023,
+              <https://www.rfc-editor.org/rfc/rfc9438>.
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
+
+9.2.  Informative References
+
+   [ABE]      Khademi, N., Welzl, M., Armitage, G., and G. Fairhurst,
+              "TCP Alternative Backoff with ECN (ABE)", RFC 8511,
+              DOI 10.17487/RFC8511, December 2018,
+              <https://www.rfc-editor.org/rfc/rfc8511>.
+
+   [AQM]      Baker, F., Ed. and G. Fairhurst, Ed., "IETF
+              Recommendations Regarding Active Queue Management",
+              BCP 197, RFC 7567, DOI 10.17487/RFC7567, July 2015,
+              <https://www.rfc-editor.org/rfc/rfc7567>.
+
+   [CUBACK]   Oku, K., "CUBACK: CUBIC Driven by the ACK Clock", n.d.,
+              <https://github.com/kazuho/draft-kazuho-ccwg-cuback>.
+
+   [ECN]      Ramakrishnan, K., Floyd, S., and D. Black, "The Addition
+              of Explicit Congestion Notification (ECN) to IP",
+              RFC 3168, DOI 10.17487/RFC3168, September 2001,
+              <https://www.rfc-editor.org/rfc/rfc3168>.
+
+   [I-D.kazuho-ccwg-rapid-start]
+              Oku, K., "Rapid Startup of Congestion Control", Work in
+              Progress, Internet-Draft, draft-kazuho-ccwg-rapid-start-
+              02, 15 March 2026, <https://datatracker.ietf.org/doc/html/
+              draft-kazuho-ccwg-rapid-start-02>.
+
+Acknowledgments
+
+   TODO acknowledge.
+
+Author's Address
+
+   Kazuho Oku
+   Fastly
+   Email: kazuhooku@gmail.com
+
+   Additional contact information:
+
+      奥 一穂
+      Fastly
