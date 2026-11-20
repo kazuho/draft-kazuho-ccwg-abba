@@ -4,8 +4,8 @@
 
 Congestion Control Working Group                        奥 一穂 (K. Oku)
 Internet-Draft                                                    Fastly
-Intended status: Standards Track                        17 November 2026
-Expires: 21 May 2027
+Intended status: Standards Track                        20 November 2026
+Expires: 24 May 2027
 
 
            Accelerated Bottleneck Bandwidth Adaptation (ABBA)
@@ -49,7 +49,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 21 May 2027.
+   This Internet-Draft will expire on 24 May 2027.
 
 Copyright Notice
 
@@ -136,12 +136,12 @@ Table of Contents
    ABBA approximates that relationship with a line through two points,
    both observed within one period between congestion events: the window
    and round-trip time on entering recovery, where the queue is at its
-   fullest, and those at the lowest round-trip time observed afterwards,
-   where it is at its emptiest.  Where a later observation falls below
-   that line, the window is no longer producing the queueing it did,
-   which is to say the bandwidth of the bottleneck has increased.  ABBA
-   then accelerates the increase of the window in proportion to that
-   discrepancy.
+   fullest, and the window on leaving recovery, where it is at its
+   emptiest, paired with the lowest round-trip time observed afterwards.
+   Where a later observation falls below that line, the window is no
+   longer producing the queueing it did, which is to say the bandwidth
+   of the bottleneck has increased.  ABBA then accelerates the increase
+   of the window in proportion to that discrepancy.
 
    ABBA does not suppress or defer any congestion response: every lost
    packet and every ECN-CE mark [ECN] produces the reduction CUBIC
@@ -288,9 +288,10 @@ Table of Contents
    The model is a line through two points, both observed within one
    period between congestion events: the high point, the window and
    round-trip time at the congestion event that began the period, where
-   the queue was built up; and the low point, the lowest round-trip time
-   observed since, where it was at its emptiest.  The line between them
-   says what round-trip time a window in that range should produce.
+   the queue was built up; and the low point, the window at the end of
+   recovery, where the queue was at its emptiest, paired with the lowest
+   round-trip time observed since.  The line between them says what
+   round-trip time a window in that range should produce.
 
    An ABBA sender therefore holds the following in addition to the state
    of CUBIC:
@@ -329,13 +330,18 @@ Table of Contents
 4.2.  The Low Point
 
    The low point is initialized when the recovery period ends, at the
-   congestion window then in hand and at high_rtt.  Thereafter, whenever
-   an acknowledgement in congestion avoidance carries a round-trip time
-   at least 1ms below low_rtt, the point moves to that sample and to the
-   window that accompanied it.  The model is fitted afresh on
-   initialization and on every move.  The 1ms threshold keeps jitter
-   from moving the point once the queue has drained and the round-trip
-   time no longer varies with the window.
+   congestion window then in hand and at high_rtt. low_cwnd remains at
+   that window.  Until the model is redrawn from the origin
+   (Section 4.4), low_rtt takes the round-trip time of any
+   acknowledgement in congestion avoidance that falls below it, and the
+   model is fitted afresh on initialization and on every such update.
+
+   The window on leaving recovery is the smallest of the period, and the
+   queue it produces the shortest.  Under the model, later samples,
+   being taken at larger windows, fall below the round-trip time
+   recorded there only where that observation was inflated by jitter;
+   the lowest of them is therefore the better estimate of the round-trip
+   time at low_cwnd.
 
    By taking high_rtt initially as the low point's round-trip time, the
    model starts flat and remains so until the path shows a round-trip
@@ -344,14 +350,11 @@ Table of Contents
 4.3.  Fitting the Line
 
    Whenever the low point is set or moves, the line is reevaluated from
-   the two points then in hand.  Where those points do not support a
-   line, either because the low point has reached or passed the high one
-   or because their round-trip times lie within RTT_SPAN_THRESH of each
-   other, the previous model is kept or a flat one is left in its place.
+   the two points then in hand.  Where their round-trip times lie within
+   RTT_SPAN_THRESH of each other, the points do not support a line, and
+   a flat model is left in its place.
 
 fit():
-  if high_cwnd <= low_cwnd:
-    return                          # keep the previous model
   if high_rtt - low_rtt < RTT_SPAN_THRESH:
     a = 0                           # flat: no prediction to invert
     b = low_rtt
@@ -360,12 +363,6 @@ fit():
             low_rtt / low_cwnd)     # capped at the line through the origin
     a = a * MAX_SLOPE_RATIO         # then flattened about the low point
     b = low_rtt - a * low_cwnd
-
-   A lower round-trip time can arrive at a window at or beyond
-   high_cwnd, which would leave no span to fit across.  The previous
-   model is kept in that case: drawing a line through the new point
-   would absorb the very decline in round-trip time that the model
-   exists to detect.
 
    The slope is capped at the line through the low point and the origin.
    On that line the window is the bandwidth multiplied by the round-trip
@@ -410,6 +407,12 @@ fit():
 
    The sender therefore goes on accelerating until the queue builds to
    meet the line.
+
+   From then on the low point plays no part, and it is no longer moved.
+   Refitting through it would bring back the line just left behind and
+   apply it far outside the range it was observed over, so that a lower
+   round-trip time, which is evidence of room on the path, could lower
+   the prediction being pursued and weaken the acceleration.
 
 5.  Accelerated Increase
 
