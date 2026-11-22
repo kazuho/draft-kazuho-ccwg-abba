@@ -1,6 +1,6 @@
 {
   "magic": "E!vIA5L86J2I",
-  "timestamp": "2026-11-19T06:45:20.793428+00:00",
+  "timestamp": "2026-11-22T05:55:49.497901+00:00",
   "repo": "kazuho/draft-kazuho-ccwg-abba",
   "labels": [
     {
@@ -72,5 +72,49 @@
       "comments": []
     }
   ],
-  "pulls": []
+  "pulls": [
+    {
+      "number": 2,
+      "id": "PR_kwDOUP3uys8AAAABQj86uQ",
+      "title": "fix the window of the low point at recovery exit; let only its RTT fall",
+      "url": "https://github.com/kazuho/draft-kazuho-ccwg-abba/pull/2",
+      "state": "MERGED",
+      "author": "kazuho",
+      "authorAssociation": "OWNER",
+      "assignees": [],
+      "labels": [],
+      "body": "## Problem\n\nThe low point used to move, as a whole, to any sample carrying a round-trip\ntime at least 1ms below low_rtt: low_cwnd jumped to the window then in hand.\nRefitting through that point makes the model predict exactly the observed RTT\nat the current window, so the gain collapses to zero at the moment the path\nshows room. Under jitter the minimum filter keeps finding new lows, each one\nre-anchoring low_cwnd and resetting the growth that had built up; a gradually\nshallower base RTT has the same effect. The 1ms threshold was meant to keep\njitter from doing this, but the cause was low_cwnd moving, not the size of the\nstep.\n\nThis is the reported failure on 5G paths switching to carrier aggregation:\ncapacity jumps, yet ABBA ramps up slowly once the path has some jitter.\n\n## Change\n\n* low_cwnd stays at the window on leaving recovery, the smallest of the period\n  and hence where the queue is shortest.\n* low_rtt takes any lower sample, with no threshold. Under the model, later\n  samples are taken at larger windows, so they fall below the RTT recorded at\n  low_cwnd only where that observation was inflated by jitter; the lowest of\n  them is the better estimate of the RTT at low_cwnd.\n* low_rtt is no longer updated once the model has been redrawn from the origin\n  (Beyond the Observed Range). Refitting through the low point there would\n  revive the abandoned line far outside its range, letting a lower RTT lower\n  the prediction being pursued.\n* fit() loses the `high_cwnd <= low_cwnd` guard and the paragraph explaining\n  it: low_cwnd now always lies below high_cwnd.\n* The introduction and the model overview describe the low point accordingly.\n\n## Evaluation\n\nImplemented in quicly (lib/cc-pico.c; not yet committed there) and compared\nagainst quicly master (\"old\") and stock CUBIC in the quicly simulator, which\nwas extended with a mid-run bandwidth/delay change (-S) and in-order jitter\napplied after the bottleneck (-J).\n\nScenario: 5G profile (40ms base RTT, 80ms queue), one CUBIC flow with pacing,\nbottleneck stepping from 100 to 500 Mbit/s. The switch time is swept over 20\npoints (40-59s) to cover the congestion epoch, crossed with jitter of\n0/2/5ms and a base-delay shift of 0/-3ms at the switch; 120 runs per variant.\n\nTime to reach 80% of 500 Mbit/s (seconds, p10/median/p90; 15 = not reached):\n\n| jitter | delay shift | stock | old | new |\n|---|---|---|---|---|\n| 0ms | 0ms | 6.4/13.9/15.0 | 0.4/0.4/0.6 | 0.3/0.3/0.3 |\n| 0ms | -3ms | 5.7/13.1/15.0 | 0.4/0.4/0.7 | 0.2/0.3/0.3 |\n| 2ms | 0ms | 6.9/14.2/15.0 | 0.9/3.7/8.7 | 0.3/0.3/0.4 |\n| 2ms | -3ms | 6.0/13.4/15.0 | 1.0/2.5/7.8 | 0.3/0.3/0.4 |\n| 5ms | 0ms | 7.1/14.7/15.0 | 1.7/5.1/11.8 | 0.3/0.3/0.4 |\n| 5ms | -3ms | 6.6/14.8/15.0 | 0.3/5.7/10.5 | 0.3/0.3/0.4 |\n\nMean goodput over the first 2s after the switch (Mbit/s):\n\n| jitter | delay shift | stock | old | new |\n|---|---|---|---|---|\n| 0ms | 0ms | 262 | 446 | 475 |\n| 0ms | -3ms | 284 | 457 | 478 |\n| 2ms | 0ms | 253 | 304 | 470 |\n| 2ms | -3ms | 272 | 315 | 459 |\n| 5ms | 0ms | 242 | 266 | 469 |\n| 5ms | -3ms | 256 | 291 | 464 |\n\nBy time since the last congestion event at the switch (all settings pooled;\ntime to 80%, p10/median/p90, with run counts):\n\n| since congestion | stock | old | new |\n|---|---|---|---|\n| < 2s | 15.0/15.0/15.0 (25) | 0.4/1.2/10.8 (22) | 0.3/0.4/1.3 (21) |\n| 2-5s | 13.9/15.0/15.0 (34) | 0.4/4.4/10.2 (36) | 0.3/0.3/0.4 (36) |\n| >= 5s | 5.1/10.6/13.9 (61) | 0.3/1.7/7.1 (62) | 0.3/0.3/0.3 (63) |\n\nObservations:\n\n* Without jitter both ABBA variants are fast; with 2-5ms of jitter the old\n  rule's median grows to 2.5-5.7s and its p90 to 8-12s, while the new rule\n  stays at 0.3s (p90 <= 0.4s).\n* Right after recovery the new rule has a slightly longer tail (p90 1.3s),\n  still far below the old one (p90 10.8s).\n* The first loss after the switch follows within 2s in 116/120 runs for the\n  new rule (old: 62/120, stock: 0/120), as the faster ramp fills the 80ms\n  queue sooner; mean goodput over the first 5s is unaffected (472-485 Mbit/s).\n\nOn a fixed-bandwidth LTE profile with random loss, and in two-flow fairness\nruns, the differences between old and new were within run-to-run variation\nat seven repetitions per cell; no flow was pushed below its fair share.\n\nLimitations: one run per point, unpaired randomness, a single flow, uniform\njitter, and no capacity decrease.\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)\n",
+      "createdAt": "2026-11-20T02:04:43Z",
+      "updatedAt": "2026-11-20T19:23:10Z",
+      "baseRepository": "kazuho/draft-kazuho-ccwg-abba",
+      "baseRefName": "main",
+      "baseRefOid": "29dfffbc8594aee528e79bf391247099f2e5beae",
+      "headRepository": "kazuho/draft-kazuho-ccwg-abba",
+      "headRefName": "kazuho/low-rtt-only",
+      "headRefOid": "0187df0e75c796707e63045129e1d74706a86cf6",
+      "closedAt": "2026-11-20T19:23:10Z",
+      "mergedAt": "2026-11-20T19:23:10Z",
+      "mergedBy": "kazuho",
+      "mergeCommit": {
+        "oid": "8b733e17b58212645cab71ab1db6e951113af586"
+      },
+      "comments": [
+        {
+          "author": "kazuho",
+          "authorAssociation": "OWNER",
+          "body": "Implementation and the simulator options used for the evaluation: h2o/quicly#805",
+          "createdAt": "2026-11-20T02:10:48Z",
+          "updatedAt": "2026-11-20T02:10:48Z"
+        },
+        {
+          "author": "kazuho",
+          "authorAssociation": "OWNER",
+          "body": "My simulator is telling me this works, hence merging. We can revert if it later turns out to be a bad idea.",
+          "createdAt": "2026-11-20T19:23:05Z",
+          "updatedAt": "2026-11-20T19:23:05Z"
+        }
+      ],
+      "reviews": []
+    }
+  ]
 }
